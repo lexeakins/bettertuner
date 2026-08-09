@@ -76,12 +76,14 @@ fun CustomTuningDialog(
             STRING_LABELS.forEachIndexed { i, label ->
                 val value = fields.getOrElse(i) { "" }
                 val warn = warnings.getOrNull(i)
+                val stdRef = TuningParser.STANDARD_REFERENCE.getOrNull(i)?.label ?: ""
                 OutlinedTextField(
                     value = value,
                     onValueChange = { newValue -> fields = fields.toMutableList().also { it[i] = newValue.take(4) } },
                     modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
                     singleLine = true,
                     placeholder = { Text("e.g. E2") },
+                    label = { Text("String $label  ·  std $stdRef") },
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.Characters,
                         imeAction = ImeAction.Next,

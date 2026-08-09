@@ -294,3 +294,15 @@ Bug reports follow a tight, reproducible harness. Each entry: symptom, root caus
 - **Regression tests:** `TuningParserTest` (parse, accidentals, warning thresholds, per-string); `TunerViewModelCustomTest`
   (apply/parse/save/rename/delete/applySaved). JVM suite green.
 - **Status:** IMPLEMENTED (2026-08-09) — pending HITL re-verify.
+- **HITL re-test (2026-08-09) found 3 gaps — fixed in commit <sha at delivery>:**
+  1. **Preset dropdown only applied DADGAD** (others fell back to Standard). Root cause: `Tuning.byName()`
+     only mapped Standard/Drop D/DADGAD; every other preset name fell through `else -> standard()`. Fixed by
+     mapping all 10 preset names. Unit test `byName_maps_all_presets` locks it.
+  2. **Delete was undiscoverable** — it lived only inside the Custom dialog, which resets `currentSavedId` on
+     reopen, so the Delete/Rename buttons were unreachable in normal flow. Fixed: saved presets now show a
+     **trash + pencil icon row directly in the dropdown** ("Your saved tunings" section). Delete is one tap.
+  3. **Soft (+2) warning seemed absent** — code was correct (unit test `warning_tuningUpTwoSemitones_isSoft`
+     passes). User had tested a note in the wrong slot (G3 in the high-e field = down-tuning = correctly no
+     warning). Fixed by surfacing each field's Standard baseline ("String 6 (low) · std E2") so the comparison
+     is obvious. Re-verify via HITL-2026-08-09b.
+- **Regression tests added:** `byName_maps_all_presets`, `warning_tuningUpTwoSemitones_soft_is_visible`.

@@ -179,6 +179,49 @@ To test on your phone:
 
 ---
 
+## HITL-2026-08-09b — Custom tunings fixes (re-test of BT-023)
+**Re-opened from BT-023.** Three issues found in HITL: only DADGAD preset applied (byName fallthrough);
+delete was undiscoverable (lived only inside a dialog that reset); soft warning at +2 seemed absent (user tested
+a note in the wrong slot — G3 in the high-e slot is a down-tuning = correctly no warning). Vehicle is explicit.
+
+- [ ] **1. Every preset in the dropdown applies its own notes** · *emulator or phone*
+  Vehicle: main screen → tap **"Tuning: <name>"** (top row, right of Auto). The dropdown opens. Tap EACH name
+  and confirm the strip + TARGET Hz change:
+  - Standard → E2 A2 D3 G3 B3 E4
+  - Half-step down → D#2 A#2 C#3 F#3 A#3 D#4
+  - Drop D → D2 A2 D3 G3 B3 E4
+  - Double Drop D → D2 A2 D3 G3 B3 D4
+  - DADGAD → D2 A2 D3 G3 A3 D4
+  - Open D → D2 A2 D3 F#3 A3 D4
+  - Open G → D2 G2 D3 G3 B3 D4
+  - Open E → E2 B2 E3 G#3 B3 E4
+  - Open C → C2 G2 C3 G3 C4 E4
+  - New Standard → C2 G2 D3 A3 E4 G4
+  ✅ if no preset wrongly shows Standard EADGBE.
+
+- [ ] **2. Custom tuning (6 fields) applies** · *emulator or phone*
+  Vehicle: dropdown → tap **"Custom…"** (bottom, bold). Dialog shows 6 fields labeled
+  "String 6 (low) · std E2" … "String 1 (high) · std E4". Type `E2, A2, D3, G3, B3, E4`, tap **Apply**.
+  ✅ if strip + targets match what you typed.
+
+- [ ] **3. Two-severity safety warnings** · *emulator or phone*
+  Vehicle: same Custom dialog. Each field shows a trailing tag (amber "⚠ 2 semi" / red "⚠ 3+ semi") + a bottom banner.
+  - SOFT: in **field 1 (std E2)** type `F#2` (exactly +2). Expect amber tag + amber banner.
+  - HARD: in **field 1 (std E2)** type `G2` (+3). Expect red tag + red "high risk of string breakage or neck warping".
+  - NOTE: warnings are per-slot-vs-that-slot's-Standard. Putting G3 in the high-e slot (std E4) is a *down*-tuning → no warning. That is correct.
+  ✅ if +2 → amber, +3 → red, and Apply stays enabled both times (warned but allowed).
+
+- [ ] **4. Save / Rename / Delete saved presets** · *emulator or phone*
+  - Save: Custom dialog → fill 6 valid notes → type a name in "Save as preset" → tap **Save preset**. Close. Re-open dropdown → preset appears under **"Your saved tunings"**.
+  - Apply saved: tap the preset name → tuner uses it.
+  - **DELETE (was missing):** in the dropdown under "Your saved tunings", each row has TWO right-side icons — a pencil (rename) and a **trash can (delete)**. Tap the **trash can** → it deletes immediately. (No long-press, no Settings trip.)
+  - Rename: tap the **pencil** → Custom dialog opens pre-filled with that tuning; edit the name → tap **Rename**.
+  ✅ if trash deletes and pencil opens rename.
+
+> Sign-off: [ ] dauthdart — HITL-2026-08-09b
+
+---
+
 <!-- TEMPLATE — copy for the next slice
 ## Slice N — <title> (commit <sha>)
 **Goal:** <one line>

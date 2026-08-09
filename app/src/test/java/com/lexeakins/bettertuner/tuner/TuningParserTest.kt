@@ -3,6 +3,7 @@ package com.lexeakins.bettertuner.tuner
 import com.lexeakins.bettertuner.pitch.NoteConverter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -67,6 +68,30 @@ class TuningParserTest {
         val std = NoteConverter.fromMidi(40) // E2
         val down = NoteConverter.fromMidi(38) // D2 (-2)
         assertEquals(TuningParser.WarningLevel.NONE, TuningParser.warningFor(std, down))
+    }
+
+    @Test
+    fun byName_maps_all_presets() {
+        // Every preset name must resolve to a non-Standard tuning (no fallthrough to standard()).
+        val names = listOf("Standard","Half-step down","Drop D","Double Drop D","DADGAD","Open D","Open G","Open E","Open C","New Standard")
+        for (n in names) {
+            val t = Tuning.byName(n)
+            if (n == "Standard") {
+                assertEquals("E2", t.targets[0].label)
+            } else {
+                // Must not silently resolve to Standard.
+                assertNotEquals("Standard", t.name)
+                assertNotEquals(listOf("E2","A2","D3","G3","B3","E4").map { it }, t.targets.map { it.label })
+            }
+        }
+    }
+
+    @Test
+    fun warning_tuningUpTwoSemitones_soft_is_visible() {
+        // Custom tuning: low-E bumped to F#2 (+2) -> SOFT warning must be present on that string.
+        val r = TuningParser.parse(listOf("F#2", "A2", "D3", "G3", "B3", "E4"))
+        assertTrue(r.ok)
+        assertEquals(TuningParser.WarningLevel.SOFT, r.warnings[0])
     }
 
     @Test

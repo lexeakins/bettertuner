@@ -73,8 +73,15 @@ data class Tuning(
         /** Build a tuning by its display name with the given A4 reference (default 440). */
         fun byName(name: String, a4Hz: Double = 440.0): Tuning = when (name) {
             "Standard" -> standard(a4Hz)
+            "Half-step down" -> halfStepDown(a4Hz)
             "Drop D" -> dropD(a4Hz)
+            "Double Drop D" -> doubleDropD(a4Hz)
             "DADGAD" -> dadgad(a4Hz)
+            "Open D" -> openD(a4Hz)
+            "Open G" -> openG(a4Hz)
+            "Open E" -> openE(a4Hz)
+            "Open C" -> openC(a4Hz)
+            "New Standard" -> newStandard(a4Hz)
             else -> standard(a4Hz)
         }
 

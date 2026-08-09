@@ -25,6 +25,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuItem
@@ -164,6 +166,15 @@ fun TunerScreen(viewModel: TunerViewModel) {
                         customTunings = ui.customTunings,
                         onPickBuiltin = { viewModel.setTuning(it) },
                         onPickSaved = { viewModel.applySavedTuning(it) },
+                        onDeleteSaved = { viewModel.deleteTuning(it) },
+                        onRenameSaved = { id ->
+                            // Open the custom dialog pre-loaded with that saved tuning, ready to rename.
+                            val saved = ui.customTunings.firstOrNull { it.id == id }
+                            if (saved != null) {
+                                viewModel.applySavedTuning(id)
+                                showCustom = true
+                            }
+                        },
                         onOpenCustom = { showCustom = true },
                     )
                 }
@@ -389,6 +400,8 @@ private fun TuningSelector(
     customTunings: List<SavedTuning>,
     onPickBuiltin: (Tuning) -> Unit,
     onPickSaved: (String) -> Unit,
+    onDeleteSaved: (String) -> Unit,
+    onRenameSaved: (String) -> Unit,
     onOpenCustom: () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -406,8 +419,23 @@ private fun TuningSelector(
             }
             if (customTunings.isNotEmpty()) {
                 HorizontalDivider()
+                Text("Your saved tunings", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
                 for (c in customTunings) {
-                    DropdownMenuItem(text = { Text(c.name) }, onClick = { onPickSaved(c.id); expanded = false })
+                    DropdownMenuItem(
+                        text = { Text(c.name) },
+                        onClick = { onPickSaved(c.id); expanded = false },
+                        trailingIcon = {
+                            Row {
+                                IconButton(onClick = { onRenameSaved(c.id); expanded = false }) {
+                                    Icon(Icons.Filled.Edit, contentDescription = "Rename ${c.name}")
+                                }
+                                IconButton(onClick = { onDeleteSaved(c.id); expanded = false }) {
+                                    Icon(Icons.Filled.Delete, contentDescription = "Delete ${c.name}")
+                                }
+                            }
+                        },
+                    )
                 }
             }
             HorizontalDivider()
