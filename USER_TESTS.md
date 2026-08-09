@@ -9,7 +9,16 @@ This is the **human-in-the-loop (HITL) test log**. It complements the automated 
 - Hermes (me) owns this file: I add the section + checklist when a slice is delivered, and I flip the
   boxes when you report results. You don't need to edit anything — just run the checks and tell me.
 - Box states: `[ ]` todo · `[x]` done · `⏳` blocked (needs a device/emulator not yet available) · `❌` failed.
-- A failed check becomes a `BT-xxx` entry in [BUGS.md](BUGS.md). I fix it, reopen the item, you re-verify.
+- **Evidence required:** every ✅/❌ is dated + device-tagged, e.g. `✅ 2026-08-09 (Pixel 10 Pro, API 35)`.
+  A bare box with no date/device is not sufficient documentation — the MD is the canonical "what was
+  actually verified on hardware" record and must be traceable.
+- **Gate:** a slice is not "complete" until its HITL checks are ✅ (or ⏳ with a stated reason). Hermes will
+  not start the next slice's UI/UX work until you've signed off.
+- **Re-test loop (required):** a ❌ opens a `BT-xxx` in [BUGS.md](BUGS.md). When fixed, Hermes **reopens the
+  checklist item** (flips back to `[ ]` with "reopened after BT-00X — please re-verify") and reposts the
+  updated checklist. The item stays open until you re-run and confirm. Nothing is silently closed.
+- The Slice status table gets a final verdict per slice (`HITL ✅ all checks, 2026-08-09`), so results also
+  surface in the summary, not only inline.
 - Each section names the **commit SHA** it belongs to, so the checklist is traceable in `git log`.
 
 ## Slice status
@@ -46,6 +55,14 @@ You only do this once. After this, every slice reuses the same emulator/phone.
 2. Top toolbar: device dropdown → pick your emulator or phone → click the green **▶ Run** (or **Run → Run 'app'**).
 3. The app builds, installs, and launches. (Right now there's no UI screen yet, so it may show a blank/app
    background — that's expected until Slice 3.) Confirm it does not crash.
+
+**E. Make `./gradlew` work from any terminal (one-time)**
+- The Gradle wrapper needs a JDK. `JAVA_HOME` is set to `C:\Program Files\Microsoft\jdk-21.0.12.8-hotspot`
+  in your **user** environment (via `setx`), and `gradle.properties` pins `org.gradle.java.home` to the
+  same path as a safety net.
+- **If you see `JAVA_HOME is not set`**: you're in a terminal that was open *before* the variable was set.
+  **Close and reopen PowerShell/terminal** — new shells inherit it. (Already-open windows don't.)
+- To check: in PowerShell run `$env:JAVA_HOME` — it should print the path above. If blank, reopen the window.
 
 ---
 
