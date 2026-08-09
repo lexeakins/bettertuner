@@ -1,6 +1,7 @@
 package com.lexeakins.bettertuner.ui
 
 import com.lexeakins.bettertuner.audio.TonePlayer
+import com.lexeakins.bettertuner.settings.SavedTuning
 import com.lexeakins.bettertuner.settings.Settings
 import com.lexeakins.bettertuner.settings.SettingsStore
 import org.junit.Assert.assertEquals
@@ -16,6 +17,10 @@ class TunerViewModelCycleTest {
     private val fakeSettings = object : SettingsStore {
         override fun get(): Settings = Settings.DEFAULT
         override fun set(settings: Settings) {}
+        override fun getSavedTunings(): List<SavedTuning> = emptyList()
+        override fun saveTuning(tuning: SavedTuning) {}
+        override fun deleteTuning(id: String) {}
+        override fun renameTuning(id: String, newName: String) {}
     }
 
     private fun vm() = TunerViewModel(tonePlayer = fakeTone, settingsStore = fakeSettings)

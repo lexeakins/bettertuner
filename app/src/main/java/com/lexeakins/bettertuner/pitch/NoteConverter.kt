@@ -49,6 +49,34 @@ object NoteConverter {
     /** The exact frequency of a given MIDI note number, using the given [a4Hz] reference (default 440). */
     fun midiToFrequency(midi: Int, a4Hz: Double = A4_HZ): Double = a4Hz * 2.0.pow((midi - A4_MIDI) / 12.0)
 
+    /** MIDI number of a note name (e.g. "A#", "Bb") + octave, e.g. midiOf("A", 4) = 69. */
+    fun midiOf(name: String, octave: Int): Int {
+        val idx = NAMES.indexOfFirst { it.equals(name, ignoreCase = true) }
+        require(idx >= 0) { "Unknown note name: $name" }
+        return idx + (octave + 1) * 12
+    }
+
+    /**
+     * Parses a note spec like "E2", "A#3", "Bb4" into a [Pitch]. Returns null if malformed.
+     * Accidental may be # or b. Octave is required. Whitespace is tolerated.
+     */
+    fun parseNote(spec: String, a4Hz: Double = A4_HZ): Pitch? {
+        val s = spec.trim()
+        if (s.isEmpty()) return null
+        val m = Regex("^([A-Ga-g])([#b]?)(\\d+)$").matchEntire(s) ?: return null
+        val letter = m.groupValues[1].uppercase()
+        val acc = m.groupValues[2]
+        val octave = m.groupValues[3].toInt()
+        val letterIdx = when (letter) {
+            "C" -> 0; "D" -> 2; "E" -> 4; "F" -> 5; "G" -> 7; "A" -> 9; "B" -> 11
+            else -> return null
+        }
+        val accSemis = when (acc) { "#" -> 1; "b" -> -1; else -> 0 }
+        val midi = (octave + 1) * 12 + letterIdx + accSemis
+        if (midi < 0 || midi > 127) return null
+        return fromMidi(midi, a4Hz)
+    }
+
     /**
      * Builds an exact [Pitch] for a MIDI note (no rounding), using the given [a4Hz] reference.
      * Use this for tuning *targets*, where the intended octave must be explicit.

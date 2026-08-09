@@ -9,11 +9,18 @@ import android.content.SharedPreferences
 interface SettingsStore {
     fun get(): Settings
     fun set(settings: Settings)
+    /** User-saved custom tuning presets. */
+    fun getSavedTunings(): List<SavedTuning>
+    fun saveTuning(tuning: SavedTuning)
+    fun deleteTuning(id: String)
+    fun renameTuning(id: String, newName: String)
 }
 
 private const val KEY_A4 = "a4_hz"
 private const val KEY_TOL = "tolerance_cents"
 private const val KEY_THEME = "theme"
+private const val KEY_CUSTOM = "custom_tunings" // JSON-ish CSV: id|name|spec,;;;
+
 
 class SharedPreferencesSettingsStore(
     private val prefs: SharedPreferences,
@@ -42,5 +49,33 @@ class SharedPreferencesSettingsStore(
             putFloat(KEY_TOL, settings.toleranceCents)
             putString(KEY_THEME, settings.theme.name)
         }.apply()
+    }
+
+    override fun getSavedTunings(): List<SavedTuning> {
+        val raw = prefs.getString(KEY_CUSTOM, "") ?: return emptyList()
+        if (raw.isBlank()) return emptyList()
+        return raw.split(";;;").mapNotNull { entry ->
+            val parts = entry.split("|")
+            if (parts.size < 3) null else SavedTuning(parts[0], parts[1], parts[2])
+        }
+    }
+
+    override fun saveTuning(tuning: SavedTuning) {
+        val current = getSavedTunings().filter { it.id != tuning.id }.toMutableList()
+        current.add(tuning)
+        writeCustom(current)
+    }
+
+    override fun deleteTuning(id: String) {
+        writeCustom(getSavedTunings().filter { it.id != id })
+    }
+
+    override fun renameTuning(id: String, newName: String) {
+        writeCustom(getSavedTunings().map { if (it.id == id) it.copy(name = newName) else it })
+    }
+
+    private fun writeCustom(list: List<SavedTuning>) {
+        val raw = list.joinToString(";;;") { "${it.id}|${it.name}|${it.spec}" }
+        prefs.edit().putString(KEY_CUSTOM, raw).apply()
     }
 }

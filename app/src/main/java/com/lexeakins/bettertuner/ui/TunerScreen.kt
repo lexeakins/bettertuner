@@ -29,9 +29,11 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuItem
 import com.lexeakins.bettertuner.settings.Settings
+import com.lexeakins.bettertuner.settings.SavedTuning
 import com.lexeakins.bettertuner.settings.ThemeMode
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -84,6 +86,7 @@ fun TunerScreen(viewModel: TunerViewModel) {
     }
     var showRationale by remember { mutableStateOf(!hasPermission) }
     var showSettings by remember { mutableStateOf(false) }
+    var showCustom by remember { mutableStateOf(false) }
 
     val launcher = rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { granted ->
         hasPermission = granted
@@ -112,6 +115,22 @@ fun TunerScreen(viewModel: TunerViewModel) {
         return
     }
 
+    if (showCustom) {
+        CustomTuningDialog(
+            initialSpec = ui.customSpec,
+            savedTunings = ui.customTunings,
+            currentSavedId = ui.currentSavedId,
+            parse = { viewModel.parseCustom(it) },
+            onApply = { spec -> if (viewModel.applyCustomTuning(spec)) showCustom = false },
+            onSave = { name -> viewModel.saveCurrentCustom(name) },
+            onRename = { id, name -> viewModel.renameTuning(id, name) },
+            onDelete = { id -> viewModel.deleteTuning(id) },
+            onDismiss = { showCustom = false },
+        )
+        return
+    }
+
+
     if (showRationale && !hasPermission) {
         RationaleScreen(
             onAllow = { launcher.launch(Manifest.permission.RECORD_AUDIO) },
@@ -139,7 +158,15 @@ fun TunerScreen(viewModel: TunerViewModel) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Box(Modifier.widthIn(max = 200.dp)) { TuningSelector(ui.tuning) { viewModel.setTuning(it) } }
+                Box(Modifier.widthIn(max = 200.dp)) {
+                    TuningSelector(
+                        current = ui.tuning,
+                        customTunings = ui.customTunings,
+                        onPickBuiltin = { viewModel.setTuning(it) },
+                        onPickSaved = { viewModel.applySavedTuning(it) },
+                        onOpenCustom = { showCustom = true },
+                    )
+                }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Auto", fontSize = 14.sp, modifier = Modifier.padding(end = 6.dp))
                     Switch(checked = ui.autoMode, onCheckedChange = { viewModel.setAutoMode(it) })
@@ -357,9 +384,15 @@ private fun StringStrip(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TuningSelector(current: Tuning, onPick: (Tuning) -> Unit) {
-    // Labeled dropdown of presets.
+private fun TuningSelector(
+    current: Tuning,
+    customTunings: List<SavedTuning>,
+    onPickBuiltin: (Tuning) -> Unit,
+    onPickSaved: (String) -> Unit,
+    onOpenCustom: () -> Unit,
+) {
     var expanded by remember { mutableStateOf(false) }
+    val a4 = 440.0
     ExposedDropdownMenuBox(
         expanded = expanded,
         onExpandedChange = { expanded = it },
@@ -368,12 +401,17 @@ private fun TuningSelector(current: Tuning, onPick: (Tuning) -> Unit) {
             Text("Tuning: ${current.name}", fontSize = 13.sp)
         }
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            for (t in listOf(Tuning.STANDARD, Tuning.DROP_D, Tuning.DADGAD)) {
-                DropdownMenuItem(
-                    text = { Text(t.name) },
-                    onClick = { onPick(t); expanded = false },
-                )
+            for (t in Tuning.presets(a4)) {
+                DropdownMenuItem(text = { Text(t.name) }, onClick = { onPickBuiltin(t); expanded = false })
             }
+            if (customTunings.isNotEmpty()) {
+                HorizontalDivider()
+                for (c in customTunings) {
+                    DropdownMenuItem(text = { Text(c.name) }, onClick = { onPickSaved(c.id); expanded = false })
+                }
+            }
+            HorizontalDivider()
+            DropdownMenuItem(text = { Text("Custom…", fontWeight = FontWeight.Bold) }, onClick = { onOpenCustom(); expanded = false })
         }
     }
 }

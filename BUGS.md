@@ -273,3 +273,24 @@ Bug reports follow a tight, reproducible harness. Each entry: symptom, root caus
   - Needle + TARGET Hz now reference the focused target, so a wrong string no longer centers the needle / greens out.
 - **Regression test:** visual HITL (focus E2, pluck tuned A2/G2/B3 -> amber "WRONG STRING", no green).
 - **Status:** FIXED (2026-08-09) — pending HITL re-verify.
+
+## BT-023 — Custom tunings + 10 presets; found latent `setTuning` discards custom pitches
+- **Requested:** 2026-08-09 — add common tunings + a custom-tuning entry (6 fields) with per-string safety
+  warnings and saved presets (save/rename/delete). Two warning severities: >2 semitones above Standard = SOFT
+  (amber); >=3 = HARD (red: breakage/neck-warp risk). Allowed but warned.
+- **Latent bug found:** `setTuning(Tuning)` rebuilt targets via `Tuning.byName(tuning.name)`, discarding the
+  passed object. A custom tuning named "Custom" fell through to `standard()` -> applying any custom/saved tuning
+  silently reset to Standard. Fixed by extracting `applyTuningObject(tuning)` that uses the object as-is;
+  `setTuning(name)` (presets) delegates via `byName`, custom path calls `applyTuningObject` directly.
+- **Implementation:**
+  - `NoteConverter.parseNote` (letter+accidental+octave, any octave, flats normalized to sharps).
+  - `TuningParser`: validates 6 specs, computes per-string `WarningLevel` vs `STANDARD_REFERENCE` (EADGBE).
+  - `Tuning.presets(a4Hz)`: 10 built-ins (Standard, Half-step down, Drop D, Double Drop D, DADGAD, Open D/G/E/C,
+    New Standard) — all within safe ranges.
+  - `SettingsStore` persists `List<SavedTuning>` (CSV); VM `saveCurrentCustom/renameTuning/deleteTuning/applySavedTuning`.
+  - `CustomTuningDialog`: 6 fields, live per-string amber/red warning, Apply (always enabled), Save/Rename/Delete.
+  - Dropdown lists presets + saved customs + "Custom…".
+  - Variable string count (ukulele, etc.) deferred — noted as future multi-instrument architecture work.
+- **Regression tests:** `TuningParserTest` (parse, accidentals, warning thresholds, per-string); `TunerViewModelCustomTest`
+  (apply/parse/save/rename/delete/applySaved). JVM suite green.
+- **Status:** IMPLEMENTED (2026-08-09) — pending HITL re-verify.

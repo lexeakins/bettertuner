@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lexeakins.bettertuner.audio.AudioRecordSource
 import com.lexeakins.bettertuner.audio.TonePlayer
+import com.lexeakins.bettertuner.settings.SavedTuning
 import com.lexeakins.bettertuner.settings.Settings
 import com.lexeakins.bettertuner.settings.SettingsStore
 import com.lexeakins.bettertuner.tuner.TuneDirection
@@ -11,6 +12,7 @@ import com.lexeakins.bettertuner.tuner.TuneLockDetector
 import com.lexeakins.bettertuner.tuner.TunerEngine
 import com.lexeakins.bettertuner.tuner.TunerState
 import com.lexeakins.bettertuner.tuner.Tuning
+import com.lexeakins.bettertuner.tuner.TuningParser
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -56,6 +58,7 @@ class TunerViewModel(
         _uiState.value = _uiState.value.copy(
             settings = loaded,
             tuning = Tuning.byName(_uiState.value.tuning.name, loaded.a4Hz),
+            customTunings = settingsStore.getSavedTunings(),
         )
     }
 
@@ -78,15 +81,21 @@ class TunerViewModel(
     }
 
     fun setTuning(tuning: Tuning) {
+        // Preset path: rebuild by name so a changed A4 reference reshapes targets. For non-preset names this
+        // falls back to Standard — custom tunings must use [applyCustomTuning] (which keeps the exact pitches).
         val s = _uiState.value.settings
-        // Rebuild targets with the current A4 reference so a changed A4 takes effect immediately.
-        val tuned = Tuning.byName(tuning.name, s.a4Hz)
+        applyTuningObject(Tuning.byName(tuning.name, s.a4Hz))
+    }
+
+    /** Applies a tuning object exactly as given (used for custom tunings whose name isn't a preset). */
+    private fun applyTuningObject(tuning: Tuning) {
+        val s = _uiState.value.settings
         inTuneSinceMs = null
-        _uiState.update { it.copy(tuning = tuned, selectedTargetIndex = 0, autoMode = true, tunedStrings = emptySet()) }
+        _uiState.update { it.copy(tuning = tuning, selectedTargetIndex = 0, autoMode = true, tunedStrings = emptySet()) }
         engine?.let { eng ->
             eng.stop()
             val src = audioSourceFactory()
-            val newEngine = TunerEngine(src, tuned, s.toleranceCents, viewModelScope)
+            val newEngine = TunerEngine(src, tuning, s.toleranceCents, viewModelScope)
             newEngine.autoMode = true
             newEngine.selectedTargetIndex = 0
             collectEngine(newEngine)
@@ -94,6 +103,58 @@ class TunerViewModel(
             engine = newEngine
         }
     }
+
+    // region Custom tunings
+
+    /** Parses 6 note specs (low->high) using [TuningParser]. Returns the safe/unsafe [TuningParser.ParseResult]. */
+    fun parseCustom(fields: List<String>): TuningParser.ParseResult {
+        val a4 = _uiState.value.settings.a4Hz
+        return TuningParser.parse(fields, a4)
+    }
+
+    /** Applies a custom tuning from 6 specs if valid. Returns true if applied. */
+    fun applyCustomTuning(fields: List<String>): Boolean {
+        val result = parseCustom(fields)
+        if (!result.ok || result.pitches == null) return false
+        val spec = fields.map { it.trim() }.joinToString(",")
+        applyTuningObject(Tuning("Custom", result.pitches))
+        _uiState.update { it.copy(customSpec = spec) }
+        return true
+    }
+
+    /** Applies an already-saved custom tuning by id. */
+    fun applySavedTuning(id: String) {
+        val saved = _uiState.value.customTunings.firstOrNull { it.id == id } ?: return
+        val fields = saved.spec.split(",")
+        if (applyCustomTuning(fields)) {
+            _uiState.update { it.copy(customSpec = saved.spec, currentSavedId = id) }
+        }
+    }
+
+    /** Saves the current custom spec as a new preset (or overwrites if name collides). */
+    fun saveCurrentCustom(name: String) {
+        val spec = _uiState.value.customSpec ?: return
+        val id = "custom_${spec.hashCode()}"
+        settingsStore.saveTuning(SavedTuning(id, name.ifBlank { "Custom" }, spec))
+        _uiState.update {
+            it.copy(customTunings = settingsStore.getSavedTunings(), currentSavedId = id)
+        }
+    }
+
+    fun renameTuning(id: String, newName: String) {
+        settingsStore.renameTuning(id, newName)
+        _uiState.update { it.copy(customTunings = settingsStore.getSavedTunings()) }
+    }
+
+    fun deleteTuning(id: String) {
+        settingsStore.deleteTuning(id)
+        _uiState.update { st ->
+            val clearedId = if (st.currentSavedId == id) null else st.currentSavedId
+            st.copy(customTunings = settingsStore.getSavedTunings(), currentSavedId = clearedId)
+        }
+    }
+
+    // endregion
 
     private fun collectEngine(eng: TunerEngine) {
         viewModelScope.launch {
@@ -242,6 +303,12 @@ data class TunerUiState(
     val settings: Settings = Settings.DEFAULT,
     /** 0..1 progress toward confirming the current target in tune (auto mode dwell). For a "settling" cue. */
     val lockProgress: Float = 0f,
+    /** User-saved custom tuning presets, shown alongside built-ins in the tuning dropdown. */
+    val customTunings: List<SavedTuning> = emptyList(),
+    /** The 6-spec string of the currently active custom tuning (e.g. "E2,A2,..."), null if not custom. */
+    val customSpec: String? = null,
+    /** Id of the saved preset currently applied, if any (so we can rename/delete it). */
+    val currentSavedId: String? = null,
 )
 
 val TunerState.directionLabel: String

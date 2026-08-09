@@ -77,6 +77,49 @@ data class Tuning(
             "DADGAD" -> dadgad(a4Hz)
             else -> standard(a4Hz)
         }
+
+        /** The built-in preset list shown in the tuning dropdown (all within safe tuning ranges). */
+        fun presets(a4Hz: Double = 440.0): List<Tuning> = listOf(
+            standard(a4Hz),
+            halfStepDown(a4Hz),
+            dropD(a4Hz),
+            doubleDropD(a4Hz),
+            dadgad(a4Hz),
+            openD(a4Hz),
+            openG(a4Hz),
+            openE(a4Hz),
+            openC(a4Hz),
+            newStandard(a4Hz),
+        )
+
+        fun halfStepDown(a4Hz: Double = 440.0) = Tuning("Half-step down", listOf(
+            NoteConverter.fromMidi(39, a4Hz), NoteConverter.fromMidi(44, a4Hz), NoteConverter.fromMidi(49, a4Hz),
+            NoteConverter.fromMidi(54, a4Hz), NoteConverter.fromMidi(58, a4Hz), NoteConverter.fromMidi(63, a4Hz),
+        ))
+        fun doubleDropD(a4Hz: Double = 440.0) = Tuning("Double Drop D", listOf(
+            NoteConverter.fromMidi(38, a4Hz), NoteConverter.fromMidi(45, a4Hz), NoteConverter.fromMidi(50, a4Hz),
+            NoteConverter.fromMidi(55, a4Hz), NoteConverter.fromMidi(59, a4Hz), NoteConverter.fromMidi(62, a4Hz),
+        ))
+        fun openD(a4Hz: Double = 440.0) = Tuning("Open D", listOf(
+            NoteConverter.fromMidi(38, a4Hz), NoteConverter.fromMidi(45, a4Hz), NoteConverter.fromMidi(50, a4Hz),
+            NoteConverter.fromMidi(54, a4Hz), NoteConverter.fromMidi(57, a4Hz), NoteConverter.fromMidi(62, a4Hz),
+        ))
+        fun openG(a4Hz: Double = 440.0) = Tuning("Open G", listOf(
+            NoteConverter.fromMidi(38, a4Hz), NoteConverter.fromMidi(43, a4Hz), NoteConverter.fromMidi(50, a4Hz),
+            NoteConverter.fromMidi(55, a4Hz), NoteConverter.fromMidi(59, a4Hz), NoteConverter.fromMidi(62, a4Hz),
+        ))
+        fun openE(a4Hz: Double = 440.0) = Tuning("Open E", listOf(
+            NoteConverter.fromMidi(40, a4Hz), NoteConverter.fromMidi(47, a4Hz), NoteConverter.fromMidi(52, a4Hz),
+            NoteConverter.fromMidi(56, a4Hz), NoteConverter.fromMidi(59, a4Hz), NoteConverter.fromMidi(64, a4Hz),
+        ))
+        fun openC(a4Hz: Double = 440.0) = Tuning("Open C", listOf(
+            NoteConverter.fromMidi(36, a4Hz), NoteConverter.fromMidi(43, a4Hz), NoteConverter.fromMidi(48, a4Hz),
+            NoteConverter.fromMidi(55, a4Hz), NoteConverter.fromMidi(60, a4Hz), NoteConverter.fromMidi(64, a4Hz),
+        ))
+        fun newStandard(a4Hz: Double = 440.0) = Tuning("New Standard", listOf(
+            NoteConverter.fromMidi(36, a4Hz), NoteConverter.fromMidi(43, a4Hz), NoteConverter.fromMidi(50, a4Hz),
+            NoteConverter.fromMidi(57, a4Hz), NoteConverter.fromMidi(64, a4Hz), NoteConverter.fromMidi(67, a4Hz),
+        ))
     }
 }
 
