@@ -260,3 +260,16 @@ Bug reports follow a tight, reproducible harness. Each entry: symptom, root caus
   confirm + advance. A tuned off-focus string no longer advances the focused one.
 - **Regression test:** flow-based; covered by HITL (focus E2, pluck tuned A2/G2 -> E does NOT advance).
 - **Status:** FIXED (2026-08-09) — pending HITL re-verify.
+
+## BT-022 — Readout misreported "IN TUNE" (green) for an off-focus string
+- **Reported:** 2026-08-09 (HITL after BT-021): advance no longer fires for a wrong string (good), but the center
+  readout still said "IN TUNE" / green when a *different* tuned string was plucked, because the engine snaps its
+  target to the nearest note. Evaluating against "any string" is misleading when tuning one string at a time.
+- **Fix (display/status only; engine + advance logic untouched):** the center readout now evaluates against the
+  **focused** string. `isFocusedNote = detected.label == focusedTarget.label`. Status logic:
+  - off-focus note whose cents-from-focused > 200¢ -> "WRONG STRING" (amber), needle deflects vs focused target.
+  - focused note: IN TUNE (green) / FLAT (blue) / SHARP (red) as before.
+  - off-focus note still near the focused target -> shows the detected note name (neutral), no false IN TUNE.
+  - Needle + TARGET Hz now reference the focused target, so a wrong string no longer centers the needle / greens out.
+- **Regression test:** visual HITL (focus E2, pluck tuned A2/G2/B3 -> amber "WRONG STRING", no green).
+- **Status:** FIXED (2026-08-09) — pending HITL re-verify.

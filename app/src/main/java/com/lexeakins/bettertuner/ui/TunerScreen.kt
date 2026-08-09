@@ -186,29 +186,47 @@ fun TunerScreen(viewModel: TunerViewModel) {
                     verticalArrangement = Arrangement.Center,
                 ) {
                     val t = ui.tuner
+                    val focusedTarget = ui.tuning.targets.getOrNull(ui.selectedTargetIndex)
+                    // Evaluate against the FOCUSED string (not "any string"). If the plucked note is the focused
+                    // one, show in-tune / flat / sharp for it. If it's a different string far from the focused
+                    // target, call it out as "WRONG STRING" instead of misreporting "IN TUNE".
+                    val detectedLabel = t.detected?.label
+                    val isFocusedNote = detectedLabel != null && detectedLabel == focusedTarget?.label
+                    val focusedCents = t.detected?.centsTo(focusedTarget ?: t.detected) ?: 0.0
+                    val wrongString = detectedLabel != null && !isFocusedNote &&
+                        focusedTarget != null && kotlin.math.abs(focusedCents) > 200.0
+
+                    val (statusLabel, statusColor) = when {
+                        detectedLabel == null -> "—" to MaterialTheme.colorScheme.onBackground
+                        wrongString -> "WRONG STRING" to Color(0xFFF9A825)
+                        t.inTune && isFocusedNote -> "IN TUNE" to Color(0xFF2E7D32)
+                        isFocusedNote && focusedCents < 0 -> "FLAT" to Color(0xFF1565C0)
+                        isFocusedNote && focusedCents > 0 -> "SHARP" to Color(0xFFC62828)
+                        // Plucking an off-focus note that's still near the focused target: show its note name.
+                        else -> (detectedLabel ?: "—") to MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+
                     Column(
                         Modifier.fillMaxWidth().weight(1f),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
                     ) {
                         Text(
-                            t.detected?.label ?: "—",
+                            detectedLabel ?: "—",
                             fontSize = 120.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (t.inTune) Color(0xFF2E7D32) else MaterialTheme.colorScheme.onBackground,
+                            color = if (wrongString) Color(0xFFF9A825)
+                                else if (t.inTune && isFocusedNote) Color(0xFF2E7D32)
+                                else MaterialTheme.colorScheme.onBackground,
                         )
-                        val cents = t.cents.toFloat()
+                        val cents = focusedCents.toFloat()
                         val needleX = (cents / 50f).coerceIn(-1f, 1f) // ±50¢ full sweep
-                        NeedleGauge(deflection = needleX, inTune = t.inTune)
+                        NeedleGauge(deflection = needleX, inTune = t.inTune && isFocusedNote)
                         Text(
-                            t.directionLabel,
+                            statusLabel,
                             fontSize = 28.sp,
                             fontWeight = FontWeight.Medium,
-                            color = when (t.direction) {
-                                TuneDirection.LOW -> Color(0xFF1565C0)
-                                TuneDirection.HIGH -> Color(0xFFC62828)
-                                TuneDirection.IN_TUNE -> Color(0xFF2E7D32)
-                            },
+                            color = statusColor,
                         )
                         Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -217,7 +235,7 @@ fun TunerScreen(viewModel: TunerViewModel) {
                             }
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text("TARGET", fontSize = 12.sp)
-                                Text("%.1f Hz".format(t.target?.frequencyHz ?: 0.0), fontSize = 18.sp)
+                                Text("%.1f Hz".format(focusedTarget?.frequencyHz ?: 0.0), fontSize = 18.sp)
                             }
                         }
                     }
