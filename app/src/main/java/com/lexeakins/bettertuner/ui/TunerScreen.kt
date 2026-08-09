@@ -77,6 +77,12 @@ fun TunerScreen(viewModel: TunerViewModel) {
         if (granted) viewModel.startEngine()
     }
 
+    // Start the engine whenever mic permission is already granted (e.g. on a fresh launch after a prior
+    // grant) — not only via the permission launcher. startEngine() is idempotent.
+    LaunchedEffect(hasPermission) {
+        if (hasPermission) viewModel.startEngine()
+    }
+
     // Reward bell: edge-triggered ding when a string locks.
     LaunchedEffect(ui.rewardBell) {
         if (viewModel.consumeRewardBell()) playRewardBell(context)
@@ -112,14 +118,26 @@ fun TunerScreen(viewModel: TunerViewModel) {
         Box(
             Modifier
                 .fillMaxSize()
-                .padding(padding),
+                .padding(padding)
+                // Swipe anywhere (up/down or left/right) to cycle the selected string. Kept on the outer Box
+                // so it never fights the per-note tap/hold gestures inside the strip.
+                .pointerInput(Unit) {
+                    var acc = 0f
+                    detectVerticalDragGestures(
+                        onDragStart = { acc = 0f },
+                        onDragEnd = { if (abs(acc) > 40f) viewModel.cycleString(if (acc < 0f) 1 else -1) },
+                    ) { _, dragAmount -> acc += dragAmount }
+                    detectHorizontalDragGestures(
+                        onDragStart = { acc = 0f },
+                        onDragEnd = { if (abs(acc) > 40f) viewModel.cycleString(if (acc < 0f) 1 else -1) },
+                    ) { _, dragAmount -> acc += dragAmount }
+                },
         ) {
             // LEFT EDGE: EADGBE strip (tappable + swipeable), for left-hand thumb.
             StringStrip(
                 tuning = ui.tuning,
                 selectedIndex = ui.selectedTargetIndex,
                 onSelect = { viewModel.selectString(it) },
-                onCycle = { viewModel.cycleString(it) },
                 onPreviewTone = { viewModel.previewTone(it) },
                 onHoldTone = { viewModel.startToneForPitch(it) },
                 onReleaseTone = { viewModel.stopReferenceTone() },
@@ -217,34 +235,15 @@ private fun StringStrip(
     tuning: Tuning,
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
-    onCycle: (Int) -> Unit,
     onPreviewTone: (Double) -> Unit,
     onHoldTone: (Double) -> Unit,
     onReleaseTone: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // Plain Column (NOT LazyColumn) so it doesn't consume drags for scrolling. Swipe accumulates offset
-    // and commits a single cycle on drag end in the dominant axis.
-    var accX by remember { mutableFloatStateOf(0f) }
-    var accY by remember { mutableFloatStateOf(0f) }
+    // Plain Column (NOT LazyColumn) so it doesn't consume drags for scrolling. Swipe-to-cycle lives on the
+    // outer Box (TunerScreen) so it never conflicts with the per-note tap/hold gestures here.
     Column(
-        modifier
-            .pointerInput(Unit) {
-                detectHorizontalDragGestures(
-                    onDragStart = { accX = 0f },
-                    onDragEnd = {
-                        if (abs(accX) > 40f) onCycle(if (accX < 0f) 1 else -1)
-                        accX = 0f
-                    },
-                ) { _, drag -> accX += drag }
-                detectVerticalDragGestures(
-                    onDragStart = { accY = 0f },
-                    onDragEnd = {
-                        if (abs(accY) > 40f) onCycle(if (accY < 0f) 1 else -1)
-                        accY = 0f
-                    },
-                ) { _, drag -> accY += drag }
-            },
+        modifier,
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -270,8 +269,7 @@ private fun StringStrip(
                                 }
                             },
                         )
-                    }
-                    .clickable { onSelect(i) },
+                    },
             ) {
                 Text(
                     target.label,

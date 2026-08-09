@@ -161,3 +161,28 @@ Bug reports follow a tight, reproducible harness. Each entry: symptom, root caus
   buffer (no clicks), plus a gentle 2nd harmonic for warmth.
 - **Regression test:** none automated (gesture/audio HITL). Re-test checks #5/#6 pending user HITL.
 - **Status:** FIXED (2026-08-09) — pending HITL re-verify.
+
+## BT-014 — Regression: engine never started when mic permission already granted
+- **Reported:** 2026-08-09 (Slice 3 HITL: after BT-012/BT-013 changes, "not detecting sound; audio not playing").
+- **Root cause:** `viewModel.startEngine()` was called ONLY inside the permission `launcher` callback. On a
+  fresh launch where `RECORD_AUDIO` was already granted (the common case after first grant), `showRationale`
+  was false, the tuner rendered, but the engine never started → no capture (readout stuck "—") and no tones.
+  The device audio + capture path were fine (instrumented capture test still passed on the phone); the bug was
+  the start trigger.
+- **Fix:** added `LaunchedEffect(hasPermission) { if (hasPermission) viewModel.startEngine() }` so the engine
+  starts whenever permission is present at launch. `startEngine()` is idempotent (`engine != null` guard).
+- **Regression test:** none automated (HITL); instrumented `AudioRecordSourceTest`/`AudioOutputProbeTest`
+  still green on the real phone, confirming capture+output subsystems are intact. Consider a UI test that
+  asserts `TunerEngine` starts when permission is pre-granted.
+- **Status:** FIXED (2026-08-09) — pending HITL re-verify.
+
+## BT-015 — Swipe-to-cycle conflicted with per-note tap/hold gestures
+- **Reported:** 2026-08-09 (Slice 3 HITL: "still can't swipe through strings").
+- **Root cause:** swipe `pointerInput` lived on the `StringStrip` Column while each note `Surface` had its own
+  `detectTapGestures` + `clickable`. The nested gesture filters swallowed the drag before the strip handler
+  saw it, so swipes never cycled.
+- **Fix:** moved swipe-to-cycle to the outer `Box` in `TunerScreen` (accumulate delta, commit one cycle on
+  drag-end >40px). `StringStrip` now handles only per-note tap (preview) / press-hold (sustained tone) with no
+  `clickable` competing for the gesture.
+- **Regression test:** none automated (gesture HITL). Re-test check #5 pending user HITL.
+- **Status:** FIXED (2026-08-09) — pending HITL re-verify.
