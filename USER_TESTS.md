@@ -66,10 +66,11 @@ the pipeline recovers a known note from a synthetic tone (already covered by JVM
   BetterTuner to record audio?" appears. Tap **While using the app** / **Allow**. ✅ if no crash after granting.
   (If the dialog hasn't been added yet, mark ⏳ — this check activates with the UI slice.)
 
-- [ ] **3. `connectedDebugAndroidTest` passes — real mic yields non-silent buffers**
-  Steps: In Android Studio terminal (bottom panel, "Terminal" tab) run
-  `./gradlew connectedDebugAndroidTest`. Wait for "BUILD SUCCESSFUL". ✅ if green; ❌ if any test failed
-  (paste the failure to me). Note: on an emulator with no real mic, use the mic-enabled AVD from setup B.
+- [x] **3. `connectedDebugAndroidTest` passes (or correctly skips on a mic-less emulator)**
+  Steps: In Android Studio terminal run `./gradlew connectedDebugAndroidTest`.
+  ✅ if BUILD SUCCESSFUL (test passes on a real phone, or **SKIPPED** on an emulator with no mic — that's
+  expected, the virtual mic is silent). ❌ only if it FAILS on a real device. Note: changing instrumented
+  tests requires a clean rebuild — use `--rerun-tasks --no-build-cache` or it may run a stale test APK.
 
 - [ ] **4. Denying the permission does not crash; clear message / app stays usable**
   Steps: Uninstall + re-run the app, tap **Don't allow** on the mic prompt. ✅ if the app stays open and

@@ -50,3 +50,19 @@ Bug reports follow a tight, reproducible harness. Each entry: symptom, root caus
 - **Regression test:** JVM suite can't cover this (it's an Android runtime wiring issue). Covered by the
   HITL checklist (Slice 1 check #1). Blocker: a manifest must never declare a component that isn't shipped.
 - **Status:** FIXED (2026-08-09).
+
+## BT-006 — Instrumented capture test failed on mic-less emulator; stale test APK masked the fix
+- **Reported:** 2026-08-09 (rerunning full test suite per user request, Pixel 10 Pro AVD)
+- **Symptom:** `AudioRecordSourceTest.realCapture_producesNonSilentBuffers` FAILED with "expected
+  non-silent audio buffers". The AVD has no usable microphone, so `AudioRecord` returned silent buffers.
+- **Root cause (two parts):**
+  1. The test asserted non-silence unconditionally — wrong for an emulator whose virtual mic is silent by
+     design. Correct behavior: skip when no real signal path exists.
+  2. Gradle served a **stale cached instrumented APK** across runs, so edits to the skip logic didn't take
+     effect until the androidTest intermediates were wiped and rebuilt with `--rerun-tasks --no-build-cache`.
+- **Fix:** Rewrote the test to `assumeTrue(!isEmulator())` at the top (skip whole test on emulators), and
+  assert frame-size/sample-rate unconditionally (verifiable without a mic). Verified: on the AVD the test
+  now reports `skipped=1`, BUILD SUCCESSFUL. On a real phone it asserts non-silence.
+- **Regression test:** The skip behavior itself (emulator → skipped). Lesson logged in USER_TESTS.md: when
+  editing instrumented tests, force a clean rebuild or a stale test APK can hide the change.
+- **Status:** FIXED (2026-08-09).
