@@ -78,3 +78,14 @@ Bug reports follow a tight, reproducible harness. Each entry: symptom, root caus
   MIDI numbers. DADGAD now `[D2, A2, D3, G3, A3, D4]`. `fromMidi` is the correct primitive for any target table.
 - **Regression test:** `TunerEngineTest.tuningPresets_haveExpectedTargets` asserts exact DADGAD labels.
 - **Status:** FIXED (2026-08-09).
+
+## BT-008 — TuneLockDetector long underflow prevented bell from ever firing
+- **Reported:** 2026-08-09 (Slice 3 JVM tests)
+- **Symptom:** `TuneLockDetector.onState` never returned true on the first lock; `TuneLockDetectorTest`
+  (firesOnRisingEdgeIntoTune / rearmsAfterWindow) failed.
+- **Root cause:** `lastRewardAt` initialized to `Long.MIN_VALUE`; the rearm check `now - lastRewardAt >=
+  rearmMillis` **overflowed** (1 - Long.MIN_VALUE wraps to a negative long), so the condition was always
+  false → the reward bell could never sound.
+- **Fix:** initialize `lastRewardAt = -rearmMillis` so the first lock is always inside the rearm window.
+- **Regression test:** `TuneLockDetectorTest` (4 cases) pins rising-edge, hold, rearm, and out-between-locks.
+- **Status:** FIXED (2026-08-09).

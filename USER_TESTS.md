@@ -121,6 +121,59 @@ visual checks come in Slice 3.
 
 ---
 
+## Slice 3 — Tuner UI + mic permission (commit <sha at delivery>)
+**Goal:** a working, "fairly powerful" tuner screen: rationale+permission flow, big clear note readout,
+needle gauge with low/high direction, exact-frequency comparison, modes (auto/manual) + auto-advance,
+tunings (Standard/Drop D/DADGAD), left-edge EADGBE strip (tap + swipe), lock-in reward bell, center-tap
+reference tone, theme toggle.
+
+**📱 First-time phone setup (for the audio checks below)**
+Most checks here need a REAL microphone — an emulator's virtual mic is silent, so it cannot verify pitch.
+To test on your phone:
+1. Phone: **Settings → About phone → tap "Build number" 7×** → Developer options.
+2. **Settings → System → Developer options → USB debugging** → ON.
+3. Plug phone into PC via USB; on the phone tap **Allow** on the "USB debugging?" prompt.
+4. Android Studio: device dropdown (top toolbar) now lists the phone → select it → **▶ Run**.
+5. Grant mic when prompted. Pluck a string near the phone's mic. (No PC mic is used.)
+
+**Emulator vs phone — what each can verify:**
+- **Emulator CAN:** layout/launch, permission rationale + deny flow, theme toggle, tuning selector UI,
+  swipe/tap navigation, Settings screen. (No audio → readout stays silent/empty.)
+- **Phone REQUIRED:** live note detection, needle moving, bell on lock-in, center-tap tone, in-tune accuracy.
+
+**Prereq:** setup A–E (top of file) + phone setup above for audio checks.
+
+- [ ] **1. First launch shows rationale; Allow → live readout appears**  · *phone or emulator*
+  Steps: Uninstall + run. Rationale screen: "BetterTuner needs the microphone to hear your guitar.
+  Nothing is recorded or sent." Tap Allow. ✅ if the tuner screen appears and (on phone) reacts to a pluck.
+
+- [ ] **2. Deny → app stays open, "Enable mic" deep-link works, no crash**  · *emulator or phone*
+  Steps: Uninstall + run → tap Don't allow. ✅ if app stays on the tuner screen (no readout) with an
+  "Enable mic" button; tapping it opens system App Info / mic settings. No crash either way.
+
+- [ ] **3. Pluck low E → big "E2", needle centers green within ±5¢, bell dings once on lock**  · *phone only*
+  Steps: On phone, pluck low E. ✅ if the large note reads "E2", the needle sits in the green center band,
+  and the reward bell sounds a single satisfying ding the moment it locks (not every frame).
+
+- [ ] **4. Toggle Drop D / DADGAD → left strip + auto-nearest set change**  · *emulator or phone*
+  Steps: Use the top tuning selector. ✅ if the left EADGBE strip updates (Drop D shows D low; DADGAD shows
+  its 6 targets) and auto mode targets within the chosen tuning.
+
+- [ ] **5. Swipe up/down + left/right cycles strings; tap a letter jumps**  · *emulator or phone*
+  Steps: On the left strip, swipe up/down and left/right; tap a letter (e.g. "G"). ✅ if the selected
+  target changes accordingly in all three ways; manual pick flips the mode toggle to Manual.
+
+- [ ] **6. Center-tap plays target tone; release stops**  · *phone only (needs audio out + in)*
+  Steps: On phone, press-and-hold the screen center while tuning a string. ✅ if you hear the target
+  note's tone while held and it stops on release. (Distinct from the lock-in bell.)
+
+- [ ] **7. Theme toggle (Light/Dark/System) applies**  · *emulator or phone*
+  Steps: Settings (gear) → Theme. ✅ if the screen recolors live and the choice persists on restart.
+
+> ⏳ **Blocked:** checks 3 & 6 require a real phone (emulator mic is silent). Everything else is emulator-verifiable.
+
+---
+
 <!-- TEMPLATE — copy for the next slice
 ## Slice N — <title> (commit <sha>)
 **Goal:** <one line>
