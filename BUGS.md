@@ -66,3 +66,15 @@ Bug reports follow a tight, reproducible harness. Each entry: symptom, root caus
 - **Regression test:** The skip behavior itself (emulator → skipped). Lesson logged in USER_TESTS.md: when
   editing instrumented tests, force a clean rebuild or a stale test APK can hide the change.
 - **Status:** FIXED (2026-08-09).
+
+## BT-007 — DADGAD targets mis-octaved (A3/D4 resolved to A2/D3)
+- **Reported:** 2026-08-09 (Slice 2 TunerEngine tests)
+- **Symptom:** `Tuning.DADGAD.targets` came out `[D2, A2, D3, G3, A2, D3]` — the 5th/6th strings (A3 220 Hz,
+  D4 293 Hz) collapsed to A2/D3 because `NoteConverter.fromFrequency` snaps to the nearest *chromatic* note
+  and rounds 220 Hz to MIDI 45 (A2) instead of 57 (A3).
+- **Root cause:** tuning targets were built from raw frequencies, so octave was implicitly chosen by rounding.
+  Targets need an *explicit* octave.
+- **Fix:** Added `NoteConverter.fromMidi(midi)` (exact, no rounding) and rebuilt all tunings from explicit
+  MIDI numbers. DADGAD now `[D2, A2, D3, G3, A3, D4]`. `fromMidi` is the correct primitive for any target table.
+- **Regression test:** `TunerEngineTest.tuningPresets_haveExpectedTargets` asserts exact DADGAD labels.
+- **Status:** FIXED (2026-08-09).

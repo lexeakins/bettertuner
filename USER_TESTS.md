@@ -17,7 +17,7 @@ This is the **human-in-the-loop (HITL) test log**. It complements the automated 
 |-------|------|--------|--------|
 | 0 | Project scaffold + pitch core + unit tests | `c71e67f` | automated ✓ / HITL n/a |
 | 1 | Audio capture seam (`AudioSource` + `AudioRecordSource` + `FakeAudioSource`) | `805619e` | HITL ✅ launched (BT-005 fixed) / ⏳ mic checks need UI |
-| 2 | TunerEngine (`StateFlow<Pitch?>`, wires capture → detector → note) | — | not started |
+| 2 | TunerEngine — `StateFlow<TunerState>` (capture→YIN→note; modes + tunings) | `pending` | not started |
 
 ---
 

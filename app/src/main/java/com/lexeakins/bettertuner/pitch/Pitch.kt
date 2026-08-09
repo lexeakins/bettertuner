@@ -23,4 +23,10 @@ data class Pitch(
 
     /** True when within [thresholdCents] of the exact note. */
     fun isInTune(thresholdCents: Double = 5.0): Boolean = cents.absoluteValue <= thresholdCents
+
+    /**
+     * Signed cents from this pitch to [other]: positive = this is sharper (higher) than [other],
+     * negative = flatter. Computed from the actual frequencies, not the within-note cents fields.
+     */
+    fun centsTo(other: Pitch): Double = 1200.0 * kotlin.math.log2(frequencyHz / other.frequencyHz)
 }

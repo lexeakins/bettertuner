@@ -44,4 +44,16 @@ object NoteConverter {
 
     /** The exact frequency of a given MIDI note number. */
     fun midiToFrequency(midi: Int): Double = A4_HZ * 2.0.pow((midi - A4_MIDI) / 12.0)
+
+    /**
+     * Builds an exact [Pitch] for a MIDI note (no rounding). Use this for tuning *targets*, where the
+     * intended octave must be explicit — [fromFrequency] would snap to the nearest chromatic note and
+     * could mis-octave a target like A3 (220 Hz) down to A2.
+     */
+    fun fromMidi(midi: Int): Pitch {
+        val targetHz = midiToFrequency(midi)
+        val octave = midi / 12 - 1
+        val nameIndex = ((midi % 12) + 12) % 12
+        return Pitch(NAMES[nameIndex], octave, 0.0, targetHz, midi)
+    }
 }
