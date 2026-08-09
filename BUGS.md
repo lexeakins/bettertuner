@@ -248,3 +248,15 @@ Bug reports follow a tight, reproducible harness. Each entry: symptom, root caus
   string no longer falsely locks). Consider a VM test driving the engine with synthetic in-tune frames < DWELL_MS
   to assert no advance.
 - **Status:** FIXED (2026-08-09) — pending HITL re-verify.
+
+## BT-021 — Auto mode advanced the focused string for a *different* string's in-tune lock
+- **Reported:** 2026-08-09 (HITL follow-up to BT-020): focused on E2, plucking a tuned A2 (or G2) still marked E2
+  as in tune and advanced it. Any in-tune note (not the focused one) confirmed + advanced the focused string.
+- **Root cause:** BT-020's dwell ran on `tunerState.inTune` regardless of *which* note was detected. In auto mode the
+  engine's `target` is the nearest detected note, so plucking a tuned A while focused on E reported "A in tune" and
+  the VM confirmed the focused index (E) for it.
+- **Fix:** gate the dwell on the detected note matching the **focused** string — `target.label == focusedTarget.label`.
+  The readout still shows the detected note (informative), but only the focused string's own in-tune state can
+  confirm + advance. A tuned off-focus string no longer advances the focused one.
+- **Regression test:** flow-based; covered by HITL (focus E2, pluck tuned A2/G2 -> E does NOT advance).
+- **Status:** FIXED (2026-08-09) — pending HITL re-verify.

@@ -101,19 +101,22 @@ class TunerViewModel(
                 val now = System.currentTimeMillis()
                 val idx = _uiState.value.selectedTargetIndex
                 val auto = _uiState.value.autoMode
+                val focusedTarget = _uiState.value.tuning.targets.getOrNull(idx)
 
-                // A string is "settling" when the current target is continuously in tune. Accumulate time; only
-                // confirm (mark tuned + advance + ding) after a stable DWELL_MS. A transient/wrong-string lock
-                // can't accumulate — it leaves tune within a frame or two, resetting the timer.
-                val stablyInTune = tunerState.inTune && tunerState.target != null
-                if (stablyInTune) {
+                // Confirm only when the *focused* string is the one detected in tune. In auto mode the engine
+                // reports whichever string is nearest (e.g. plucking a tuned A while focused on E), but we must
+                // not advance E for a different string's lock. The readout still shows the detected note.
+                val detectedIsFocused = tunerState.inTune &&
+                    tunerState.target != null &&
+                    tunerState.target.label == focusedTarget?.label
+                if (detectedIsFocused) {
                     if (inTuneSinceMs == null) inTuneSinceMs = now
                 } else {
                     inTuneSinceMs = null
                 }
                 val elapsed = inTuneSinceMs?.let { now - it } ?: 0L
                 val lockProgress = (elapsed.toFloat() / DWELL_MS).coerceIn(0f, 1f)
-                val confirmed = auto && stablyInTune && elapsed >= DWELL_MS
+                val confirmed = auto && detectedIsFocused && elapsed >= DWELL_MS
 
                 _uiState.update { st ->
                     val tuned = if (confirmed) st.tunedStrings + idx else st.tunedStrings
