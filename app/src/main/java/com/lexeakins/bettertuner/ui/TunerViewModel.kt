@@ -17,12 +17,14 @@ import kotlinx.coroutines.launch
 
 /**
  * Bridges [TunerEngine] to the Compose screen. Owns UI-only state (selected tuning, mode, permission
- * gate, settings) and translates engine events (lock-in) into one-shot side effects (reward bell, tone).
+ * gate, settings, per-string tuning progress) and translates engine events (lock-in) into one-shot side
+ * effects (reward bell, tone, auto-advance).
  *
  * Design decisions from the grill-me session:
  * - Manual target selection flips autoMode off (manual wins); re-toggling Auto resumes it.
- * - Bell fires once per lock edge (via [TuneLockDetector]).
- * - Center-tap plays the target tone while held; release stops it.
+ * - Bell fires once per lock edge (via [TuneLockDetector]); on lock the string is marked tuned and, in auto
+ *   mode, the UI advances to the next string (low E -> high e).
+ * - Left-menu notes: tap = short preview, press-and-hold = sustained tone; release stops.
  */
 class TunerViewModel(
     private val audioSourceFactory: () -> com.lexeakins.bettertuner.audio.AudioSource = { AudioRecordSource() },
@@ -43,12 +45,7 @@ class TunerViewModel(
         engine = TunerEngine(source, _uiState.value.tuning, inTuneCents, viewModelScope)
         engine!!.autoMode = _uiState.value.autoMode
         engine!!.selectedTargetIndex = _uiState.value.selectedTargetIndex
-        viewModelScope.launch {
-            engine!!.state.collect { tunerState ->
-                val bell = lockDetector.onState(tunerState.inTune, tunerState.cents, System.currentTimeMillis())
-                _uiState.update { it.copy(tuner = tunerState, rewardBell = bell) }
-            }
-        }
+        collectEngine(engine!!)
         engine!!.start()
     }
 
@@ -58,7 +55,7 @@ class TunerViewModel(
     }
 
     fun setTuning(tuning: Tuning) {
-        _uiState.update { it.copy(tuning = tuning, selectedTargetIndex = 0, autoMode = true) }
+        _uiState.update { it.copy(tuning = tuning, selectedTargetIndex = 0, autoMode = true, tunedStrings = emptySet()) }
         engine?.let { eng ->
             eng.stop()
             val src = audioSourceFactory()
@@ -75,7 +72,26 @@ class TunerViewModel(
         viewModelScope.launch {
             eng.state.collect { tunerState ->
                 val bell = lockDetector.onState(tunerState.inTune, tunerState.cents, System.currentTimeMillis())
-                _uiState.update { it.copy(tuner = tunerState, rewardBell = bell) }
+                val idx = _uiState.value.selectedTargetIndex
+                val auto = _uiState.value.autoMode
+                _uiState.update { st ->
+                    var nextIdx = idx
+                    var nextAuto = auto
+                    // On a lock edge: mark this string tuned; in auto mode, advance to the next string.
+                    val tuned = if (bell) st.tunedStrings + idx else st.tunedStrings
+                    if (bell && auto) {
+                        val size = st.tuning.targets.size
+                        nextIdx = (idx + 1) % size
+                        nextAuto = true // stay in auto; advancing is the auto behavior
+                    }
+                    st.copy(tuner = tunerState, rewardBell = bell, tunedStrings = tuned,
+                        selectedTargetIndex = nextIdx, autoMode = nextAuto)
+                }
+                // Reflect the advance into the engine so its target tracks the UI.
+                if (bell && auto) {
+                    eng.selectedTargetIndex = _uiState.value.selectedTargetIndex
+                    eng.autoMode = true
+                }
             }
         }
     }
@@ -96,7 +112,10 @@ class TunerViewModel(
         }
     }
 
-    /** Cycle the selected string by [delta] (e.g. +1 = next higher). Manual mode. */
+    /**
+     * Cycle the selected string by [delta]. Convention: +1 = toward the high e string (index increases),
+     * -1 = toward low E. A downward swipe maps to +1 (matches "swipe down -> higher string").
+     */
     fun cycleString(delta: Int) {
         val size = _uiState.value.tuning.targets.size
         val next = (_uiState.value.selectedTargetIndex + delta).mod(size)
@@ -124,7 +143,6 @@ class TunerViewModel(
         }
     }
 
-
     fun consumeRewardBell(): Boolean {
         val fire = _uiState.value.rewardBell
         if (fire) _uiState.update { it.copy(rewardBell = false) }
@@ -140,6 +158,7 @@ class TunerViewModel(
 
 /**
  * UI-facing snapshot. [tuner] is the live engine state; the rest is UI-only state.
+ * [tunedStrings] holds the indices already detected in-tune, for whole-instrument progress display.
  */
 data class TunerUiState(
     val tuner: TunerState = TunerState(),
@@ -147,6 +166,7 @@ data class TunerUiState(
     val autoMode: Boolean = true,
     val selectedTargetIndex: Int = 0,
     val rewardBell: Boolean = false,
+    val tunedStrings: Set<Int> = emptySet(),
 )
 
 val TunerState.directionLabel: String

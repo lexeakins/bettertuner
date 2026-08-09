@@ -1,12 +1,8 @@
 package com.lexeakins.bettertuner.ui
 
 import android.Manifest
-import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
-import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -16,6 +12,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,8 +20,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -42,6 +45,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -71,14 +75,13 @@ fun TunerScreen(viewModel: TunerViewModel) {
     var showRationale by remember { mutableStateOf(!hasPermission) }
     var showSettings by remember { mutableStateOf(false) }
 
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+    val launcher = rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { granted ->
         hasPermission = granted
         showRationale = !granted
         if (granted) viewModel.startEngine()
     }
 
-    // Start the engine whenever mic permission is already granted (e.g. on a fresh launch after a prior
-    // grant) — not only via the permission launcher. startEngine() is idempotent.
+    // Start the engine whenever mic permission is already granted (e.g. fresh launch after a prior grant).
     LaunchedEffect(hasPermission) {
         if (hasPermission) viewModel.startEngine()
     }
@@ -107,64 +110,74 @@ fun TunerScreen(viewModel: TunerViewModel) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("BetterTuner") },
+                title = { Text("BetterTuner", fontWeight = FontWeight.Bold) },
                 actions = {
-                    TuningSelector(ui.tuning) { viewModel.setTuning(it) }
-                    TextButton(onClick = { showSettings = true }) { Text("\u2699") }
+                    IconButton(onClick = { showSettings = true }) {
+                        Icon(Icons.Filled.Settings, contentDescription = "Settings")
+                    }
                 },
             )
         },
     ) { padding ->
-        Box(
-            Modifier
-                .fillMaxSize()
-                .padding(padding)
-                // Swipe anywhere (up/down or left/right) to cycle the selected string. Kept on the outer Box
-                // so it never fights the per-note tap/hold gestures inside the strip.
-                .pointerInput(Unit) {
-                    var acc = 0f
-                    detectVerticalDragGestures(
-                        onDragStart = { acc = 0f },
-                        onDragEnd = { if (abs(acc) > 40f) viewModel.cycleString(if (acc < 0f) 1 else -1) },
-                    ) { _, dragAmount -> acc += dragAmount }
-                    detectHorizontalDragGestures(
-                        onDragStart = { acc = 0f },
-                        onDragEnd = { if (abs(acc) > 40f) viewModel.cycleString(if (acc < 0f) 1 else -1) },
-                    ) { _, dragAmount -> acc += dragAmount }
-                },
-        ) {
-            // LEFT EDGE: EADGBE strip (tappable + swipeable), for left-hand thumb.
-            StringStrip(
-                tuning = ui.tuning,
-                selectedIndex = ui.selectedTargetIndex,
-                onSelect = { viewModel.selectString(it) },
-                onPreviewTone = { viewModel.previewTone(it) },
-                onHoldTone = { viewModel.startToneForPitch(it) },
-                onReleaseTone = { viewModel.stopReferenceTone() },
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .fillMaxHeight(0.8f)
-                    .width(72.dp),
-            )
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            // Row 2: tuning preset selector + auto toggle.
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                TuningSelector(ui.tuning) { viewModel.setTuning(it) }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Auto", fontSize = 14.sp)
+                    Switch(checked = ui.autoMode, onCheckedChange = { viewModel.setAutoMode(it) })
+                }
+            }
 
-            // CENTER: big note + needle + freq compare. No tone here — tone lives on the left-menu notes
-            // (tap/hold) so swipes on the strip are never hijacked by a long-press.
-            Column(
+            // Main area: left strip + center readout.
+            Box(
                 Modifier
                     .fillMaxSize()
-                    .padding(start = 72.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
+                    // Swipe anywhere (up/down or left/right) to cycle the selected string. Kept on the outer
+                    // Box so it never fights the per-note tap/hold gestures inside the strip.
+                    .pointerInput(Unit) {
+                        var acc = 0f
+                        val commit = { dir: Int -> if (abs(acc) > 40f) viewModel.cycleString(dir) }
+                        detectVerticalDragGestures(
+                            onDragStart = { acc = 0f },
+                            onDragEnd = { commit(if (acc < 0f) -1 else 1) }, // swipe up = lower, down = higher
+                        ) { _, dragAmount -> acc += dragAmount }
+                        detectHorizontalDragGestures(
+                            onDragStart = { acc = 0f },
+                            onDragEnd = { commit(if (acc < 0f) -1 else 1) },
+                        ) { _, dragAmount -> acc += dragAmount }
+                    },
             ) {
-                val t = ui.tuner
+                StringStrip(
+                    tuning = ui.tuning,
+                    selectedIndex = ui.selectedTargetIndex,
+                    tunedStrings = ui.tunedStrings,
+                    onSelect = { viewModel.selectString(it) },
+                    onPreviewTone = { viewModel.previewTone(it) },
+                    onHoldTone = { viewModel.startToneForPitch(it) },
+                    onReleaseTone = { viewModel.stopReferenceTone() },
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .fillMaxHeight(0.8f)
+                        .width(72.dp),
+                )
+
                 Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
+                    Modifier.fillMaxSize().padding(start = 72.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
-                    Text(
+                    val t = ui.tuner
+                    Column(
+                        Modifier.fillMaxWidth().weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Text(
                             t.detected?.label ?: "—",
                             fontSize = 120.sp,
                             fontWeight = FontWeight.Bold,
@@ -194,20 +207,17 @@ fun TunerScreen(viewModel: TunerViewModel) {
                             }
                         }
                     }
-                }
 
-                Row(Modifier.padding(bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Auto", fontSize = 16.sp)
-                    Switch(checked = ui.autoMode, onCheckedChange = { viewModel.setAutoMode(it) })
-                }
-                if (!hasPermission) {
-                    Button(onClick = { launcher.launch(Manifest.permission.RECORD_AUDIO) }) {
-                        Text("Enable mic")
+                    if (!hasPermission) {
+                        OutlinedButton(onClick = { launcher.launch(Manifest.permission.RECORD_AUDIO) }) {
+                            Text("Enable mic")
+                        }
                     }
                 }
             }
         }
     }
+}
 
 @Composable
 private fun NeedleGauge(deflection: Float, inTune: Boolean) {
@@ -215,10 +225,8 @@ private fun NeedleGauge(deflection: Float, inTune: Boolean) {
         val w = size.width
         val midX = w / 2
         val y = size.height / 2
-        // center green band for +/-5% of sweep
         val band = w * 0.05f
         drawLine(Color(0xFF2E7D32), Offset(midX - band, y), Offset(midX + band, y), strokeWidth = 6f)
-        // needle
         val nx = midX + deflection * (w / 2 - 8f)
         drawLine(
             if (inTune) Color(0xFF2E7D32) else Color(0xFF9E9E9E),
@@ -234,6 +242,7 @@ private fun NeedleGauge(deflection: Float, inTune: Boolean) {
 private fun StringStrip(
     tuning: Tuning,
     selectedIndex: Int,
+    tunedStrings: Set<Int>,
     onSelect: (Int) -> Unit,
     onPreviewTone: (Double) -> Unit,
     onHoldTone: (Double) -> Unit,
@@ -249,14 +258,14 @@ private fun StringStrip(
     ) {
         tuning.targets.forEachIndexed { i, target ->
             val selected = i == selectedIndex
-            Surface(
-                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier
+            val tuned = tunedStrings.contains(i)
+            Box(
+                Modifier
                     .fillMaxWidth()
                     .padding(4.dp)
+                    // Grey the note out once it's been detected in-tune (whole-instrument progress).
+                    .alpha(if (tuned) 0.35f else 1f)
                     .clip(RoundedCornerShape(8.dp))
-                    // Tap = short preview of this note; press-and-hold = sustained tone until release.
                     .pointerInput(Unit) {
                         detectTapGestures(
                             onTap = { onPreviewTone(target.frequencyHz) },
@@ -270,31 +279,56 @@ private fun StringStrip(
                             },
                         )
                     },
+                contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    target.label,
-                    fontSize = 22.sp,
-                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                    color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(vertical = 10.dp).fillMaxWidth(),
-                )
+                Surface(
+                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        target.label,
+                        fontSize = 22.sp,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                        color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(vertical = 10.dp).fillMaxWidth(),
+                    )
+                }
+                // Green check at full opacity when this string is tuned (overlays the greyed note).
+                if (tuned) {
+                    Icon(
+                        Icons.Filled.Check,
+                        contentDescription = "In tune",
+                        tint = Color(0xFF2E7D32),
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .padding(end = 6.dp),
+                    )
+                }
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TuningSelector(current: Tuning, onPick: (Tuning) -> Unit) {
-    // Simplified: a row of three buttons (Standard / Drop D / DADGAD).
-    Row {
-        for (t in listOf(Tuning.STANDARD, Tuning.DROP_D, Tuning.DADGAD)) {
-            val active = t.name == current.name
-            OutlinedButton(
-                onClick = { onPick(t) },
-                modifier = Modifier.padding(horizontal = 2.dp).height(36.dp),
-            ) {
-                Text(t.name, fontSize = 12.sp, color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+    // Labeled dropdown of presets.
+    var expanded by remember { mutableStateOf(false) }
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it },
+    ) {
+        OutlinedButton(onClick = { expanded = true }, modifier = Modifier.menuAnchor().height(40.dp)) {
+            Text("Tuning: ${current.name}", fontSize = 13.sp)
+        }
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            for (t in listOf(Tuning.STANDARD, Tuning.DROP_D, Tuning.DADGAD)) {
+                DropdownMenuItem(
+                    text = { Text(t.name) },
+                    onClick = { onPick(t); expanded = false },
+                )
             }
         }
     }
@@ -309,7 +343,7 @@ private fun RationaleScreen(onAllow: () -> Unit, onDenied: () -> Unit) {
     ) {
         Text("BetterTuner needs the microphone to hear your guitar.", fontSize = 20.sp, textAlign = TextAlign.Center)
         Text("Nothing is recorded or sent anywhere. Audio is processed on your device only.", fontSize = 14.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 12.dp))
-        Button(onClick = onAllow, modifier = Modifier.padding(top = 24.dp)) { Text("Allow microphone") }
+        OutlinedButton(onClick = onAllow, modifier = Modifier.padding(top = 24.dp)) { Text("Allow microphone") }
         TextButton(onClick = onDenied) { Text("Continue without mic") }
     }
 }
@@ -318,11 +352,10 @@ private fun RationaleScreen(onAllow: () -> Unit, onDenied: () -> Unit) {
 private fun SettingsScreen(onBack: () -> Unit, onTheme: () -> Unit) {
     Column(Modifier.fillMaxSize().padding(24.dp)) {
         Text("Settings", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-        // v1: theme note + A4 reference + tolerance placeholders (full controls in a later slice).
         Text("Theme: System (Light/Dark toggle — coming in Settings v2)", fontSize = 16.sp, modifier = Modifier.padding(top = 16.dp))
         Text("A4 reference: 440 Hz", fontSize = 16.sp, modifier = Modifier.padding(top = 8.dp))
         Text("In-tune tolerance: ±5 cents", fontSize = 16.sp, modifier = Modifier.padding(top = 8.dp))
-        Button(onClick = onBack, modifier = Modifier.padding(top = 24.dp)) { Text("Back") }
+        OutlinedButton(onClick = onBack, modifier = Modifier.padding(top = 24.dp)) { Text("Back") }
     }
 }
 

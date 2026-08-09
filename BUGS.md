@@ -186,3 +186,32 @@ Bug reports follow a tight, reproducible harness. Each entry: symptom, root caus
   `clickable` competing for the gesture.
 - **Regression test:** none automated (gesture HITL). Re-test check #5 pending user HITL.
 - **Status:** FIXED (2026-08-09) — pending HITL re-verify.
+
+## BT-016 — Swipe direction inverted (down should go to a higher string)
+- **Reported:** 2026-08-09 (Slice 3 HITL polish: "if I'm on A2, swipe down I expect to go to B; it goes to E2").
+- **Root cause:** swipe-down produced a negative cycle delta (toward low E) instead of positive (toward high e).
+- **Fix:** swipe maps `acc < 0 -> -1` (up = lower), `acc > 0 -> +1` (down = higher). `cycleString(+1)` = index+1
+  (toward high e). Covered by `TunerViewModelCycleTest.cycleString_directionConvention`.
+- **Regression test:** `TunerViewModelCycleTest` (2 cases). JVM suite now 34 tests green.
+- **Status:** FIXED (2026-08-09) — pending HITL re-verify.
+
+## BT-017 — Auto mode locked but did not advance the UI to the next string
+- **Reported:** 2026-08-09 (Slice 3 HITL polish: "auto mode works... but it does not advance the UI").
+- **Root cause:** `TuneLockDetector` fired the bell, but nothing consumed the lock to move the target forward.
+- **Fix:** in the engine-state collect, on a lock edge in auto mode the VM marks the string `tunedStrings`,
+  advances `selectedTargetIndex` to `(idx+1) % size` (staying in auto), and reflects it into the engine. Manual
+  pick still flips to Manual (auto wins only until you interact).
+- **Regression test:** auto-advance is HITL (needs live detection); direction/tuned-set logic covered by VM tests.
+- **Status:** FIXED (2026-08-09) — pending HITL re-verify.
+
+## BT-018 — Top UI redesign + whole-instrument tuning progress
+- **Reported:** 2026-08-09 (Slice 3 HITL polish): top bar was a mess (title cramped, stray settings glyph,
+  tunings with no label, Auto toggle randomly placed). Also requested visual progress: grey + green check on
+  each tuned string.
+- **Fix:**
+  - Top: row 1 = "BetterTuner" title (left) + settings gear (right). Row 2 = "Tuning:" dropdown (presets) +
+    Auto switch, spaced via SpaceBetween.
+  - String strip: each note greys to alpha 0.35 once detected in-tune (`tunedStrings`), with a full-opacity
+    green check overlay at the right — whole-guitar progress as you tune.
+- **Regression test:** none automated (visual HITL). Re-test checks #4/#5/#6 + new progress visuals pending HITL.
+- **Status:** FIXED (2026-08-09) — pending HITL re-verify.
