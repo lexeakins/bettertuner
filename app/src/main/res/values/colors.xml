@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand palette: deep forest green + near-black. Mirrors the in-app in-tune color. -->
+    <color name="brand_green">#2E7D32</color>
+    <color name="brand_green_dark">#1B5E20</color>
+    <color name="brand_near_black">#121212</color>
+</resources>

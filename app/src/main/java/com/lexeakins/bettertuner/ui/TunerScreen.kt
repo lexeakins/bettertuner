@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -126,9 +127,9 @@ fun TunerScreen(viewModel: TunerViewModel) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                TuningSelector(ui.tuning) { viewModel.setTuning(it) }
+                Box(Modifier.widthIn(max = 200.dp)) { TuningSelector(ui.tuning) { viewModel.setTuning(it) } }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Auto", fontSize = 14.sp)
+                    Text("Auto", fontSize = 14.sp, modifier = Modifier.padding(end = 6.dp))
                     Switch(checked = ui.autoMode, onCheckedChange = { viewModel.setAutoMode(it) })
                 }
             }
