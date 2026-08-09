@@ -35,7 +35,11 @@ class AudioRecordSource(
             while (!Thread.currentThread().isInterrupted) {
                 val read = record.read(shorts, 0, shorts.size)
                 if (read > 0) {
-                    val floats = FloatArray(read) { i -> shorts[i] / 32768.0f }
+                    // Always emit a full frame-sized buffer; zero-pad short reads so downstream
+                    // detection sees a consistent window (YIN needs n >= 2*tauMax+1).
+                    val floats = FloatArray(framesPerBuffer) { i ->
+                        if (i < read) shorts[i] / 32768.0f else 0f
+                    }
                     onBuffer(floats)
                 }
             }

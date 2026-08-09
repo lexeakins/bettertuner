@@ -89,3 +89,32 @@ Bug reports follow a tight, reproducible harness. Each entry: symptom, root caus
 - **Fix:** initialize `lastRewardAt = -rearmMillis` so the first lock is always inside the rearm window.
 - **Regression test:** `TuneLockDetectorTest` (4 cases) pins rising-edge, hold, rearm, and out-between-locks.
 - **Status:** FIXED (2026-08-09).
+
+## BT-009 — AudioRecordSource emitted short buffers; detection silently failed
+- **Reported:** 2026-08-09 (Slice 3 HITL, user's Motorola razr; also caught by instrumented test on phone)
+- **Symptom:** After the app's first run, the readout stayed "—" and no note was detected. The JVM pipeline
+  test passed because the Fake always emits exactly 4096 samples.
+- **Root cause:** `AudioRecordSource` emitted `FloatArray(read)` where `read` is the *actual* samples
+  returned by `AudioRecord.read` (often < the requested 4096). YIN needs `n >= 2*tauMax+1`, so short buffers
+  returned null → no detection. The instrumented capture test on the real phone failed with
+  "every captured buffer should be the requested frame size".
+- **Fix:** Emit a full `framesPerBuffer`-sized FloatArray, zero-padding short reads, so the engine always
+  gets a consistent detection window.
+- **Regression test:** `AudioRecordSourceTest` now passes on the real phone (motorola razr 2024, API 15) —
+  non-silent, correctly-sized 4096-sample buffers at 44.1 kHz. (Runs on emulator only as SKIP.)
+- **Status:** FIXED (2026-08-09).
+
+## BT-010 — Reward bell / tone AudioTrack could crash the app on lock-in
+- **Reported:** 2026-08-09 (Slice 3 HITL: "app closed on first pluck", then silent on relaunch)
+- **Symptom:** App closed the moment a string locked in tune (bell fired), and on relaunch made no sound at
+  all (bell + center-tap tone both dead).
+- **Root cause:** `playRewardBell` built + played an `AudioTrack` on the main/Compose thread with no
+  guard; a `STATE_UNINITIALIZED` or config exception threw and killed the process. The center-tone
+  `AudioTrackTonePlayer` had the same unguarded path.
+- **Fix:** Moved bell synthesis/play to a background thread, wrapped in try/catch (failures logged, never
+  thrown), and gated on `AudioTrack.state == STATE_INITIALIZED`. Applied the same defensive pattern to
+  `AudioTrackTonePlayer` (explicit attributes, MODE_STREAM, swallow+log on failure). Audio path can no
+  longer crash the UI.
+- **Regression test:** instrumented capture test confirms the audio subsystem initializes on the phone;
+  unit-level coverage pending (AudioTrack is Android-runtime, covered by HITL).
+- **Status:** FIXED (2026-08-09).

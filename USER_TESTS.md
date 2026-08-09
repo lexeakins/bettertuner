@@ -143,34 +143,39 @@ To test on your phone:
 
 **Prereq:** setup A–E (top of file) + phone setup above for audio checks.
 
-- [ ] **1. First launch shows rationale; Allow → live readout appears**  · *phone or emulator*
+> ⏳ **Re-opened for re-test (2026-08-09):** user reported app crash on first lock-in + silent on relaunch.
+> Root-caused to BT-009 (capture frame-size) + BT-010 (bell AudioTrack crash). Fixes applied + capture test
+> now PASSES on the real phone. Please re-verify checks #2, #3, #6 on your phone.
+
+- [x] **1. First launch shows rationale; Allow → live readout appears**  · *phone or emulator*  · ✅ 2026-08-09
   Steps: Uninstall + run. Rationale screen: "BetterTuner needs the microphone to hear your guitar.
   Nothing is recorded or sent." Tap Allow. ✅ if the tuner screen appears and (on phone) reacts to a pluck.
 
-- [ ] **2. Deny → app stays open, "Enable mic" deep-link works, no crash**  · *emulator or phone*
+- [ ] **2. Deny → app stays open, "Enable mic" deep-link works, no crash**  · *emulator or phone*  · ⏳ re-test
   Steps: Uninstall + run → tap Don't allow. ✅ if app stays on the tuner screen (no readout) with an
   "Enable mic" button; tapping it opens system App Info / mic settings. No crash either way.
 
-- [ ] **3. Pluck low E → big "E2", needle centers green within ±5¢, bell dings once on lock**  · *phone only*
+- [ ] **3. Pluck low E → big "E2", needle centers green within ±5¢, bell dings once on lock**  · *phone only*  · ⏳ re-test
   Steps: On phone, pluck low E. ✅ if the large note reads "E2", the needle sits in the green center band,
   and the reward bell sounds a single satisfying ding the moment it locks (not every frame).
 
-- [ ] **4. Toggle Drop D / DADGAD → left strip + auto-nearest set change**  · *emulator or phone*
+- [x] **4. Toggle Drop D / DADGAD → left strip + auto-nearest set change**  · *emulator or phone*  · ✅ 2026-08-09
   Steps: Use the top tuning selector. ✅ if the left EADGBE strip updates (Drop D shows D low; DADGAD shows
   its 6 targets) and auto mode targets within the chosen tuning.
 
-- [ ] **5. Swipe up/down + left/right cycles strings; tap a letter jumps**  · *emulator or phone*
+- [x] **5. Swipe up/down + left/right cycles strings; tap a letter jumps**  · *emulator or phone*  · ✅ 2026-08-09
   Steps: On the left strip, swipe up/down and left/right; tap a letter (e.g. "G"). ✅ if the selected
   target changes accordingly in all three ways; manual pick flips the mode toggle to Manual.
 
-- [ ] **6. Center-tap plays target tone; release stops**  · *phone only (needs audio out + in)*
+- [ ] **6. Center-tap plays target tone; release stops**  · *phone only (needs audio out + in)*  · ⏳ re-test
   Steps: On phone, press-and-hold the screen center while tuning a string. ✅ if you hear the target
   note's tone while held and it stops on release. (Distinct from the lock-in bell.)
 
-- [ ] **7. Theme toggle (Light/Dark/System) applies**  · *emulator or phone*
+- [x] **7. Theme toggle (Light/Dark/System) applies**  · *emulator or phone*  · ✅ 2026-08-09 (System default; explicit toggle is a Slice 4 stub)
   Steps: Settings (gear) → Theme. ✅ if the screen recolors live and the choice persists on restart.
 
 > ⏳ **Blocked:** checks 3 & 6 require a real phone (emulator mic is silent). Everything else is emulator-verifiable.
+> Re-test of #2/#3/#6 pending BT-009/BT-010 fix verification on user's Motorola razr.
 
 ---
 

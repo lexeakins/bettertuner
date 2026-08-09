@@ -300,33 +300,44 @@ private fun SettingsScreen(onBack: () -> Unit, onTheme: () -> Unit) {
 
 /** Play a short, satisfying reward "ding" — fully synthesized on-device, no assets, no network. */
 private fun playRewardBell(context: android.content.Context) {
-    val sampleRate = 44100
-    val durationMs = 180
-    val n = (sampleRate * durationMs) / 1000
-    val buf = ShortArray(n)
-    // Two-tone pleasant bell: 880 Hz + 1320 Hz with a fast decay.
-    for (i in 0 until n) {
-        val t = i.toDouble() / sampleRate
-        val env = kotlin.math.exp(-t * 18)
-        val s = (kotlin.math.sin(2 * Math.PI * 880 * t) + 0.6 * kotlin.math.sin(2 * Math.PI * 1320 * t)) * env
-        buf[i] = (s * 0.7 * Short.MAX_VALUE).toInt().toShort()
-    }
-    val audioTrack = android.media.AudioTrack.Builder()
-        .setAudioAttributes(
-            android.media.AudioAttributes.Builder()
-                .setUsage(android.media.AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
-                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                .build(),
-        )
-        .setAudioFormat(
-            android.media.AudioFormat.Builder()
-                .setEncoding(android.media.AudioFormat.ENCODING_PCM_16BIT)
-                .setSampleRate(sampleRate)
-                .setChannelMask(android.media.AudioFormat.CHANNEL_OUT_MONO)
-                .build(),
-        )
-        .setTransferMode(android.media.AudioTrack.MODE_STATIC)
-        .build()
-    audioTrack.write(buf, 0, buf.size)
-    audioTrack.play()
+    // Run off the main thread; never let an audio-config failure crash the UI.
+    Thread({
+        try {
+            val sampleRate = 44100
+            val durationMs = 180
+            val n = (sampleRate * durationMs) / 1000
+            val buf = ShortArray(n)
+            for (i in 0 until n) {
+                val t = i.toDouble() / sampleRate
+                val env = kotlin.math.exp(-t * 18)
+                val s = (kotlin.math.sin(2 * Math.PI * 880 * t) + 0.6 * kotlin.math.sin(2 * Math.PI * 1320 * t)) * env
+                buf[i] = (s * 0.7 * Short.MAX_VALUE).toInt().toShort()
+            }
+            val track = android.media.AudioTrack.Builder()
+                .setAudioAttributes(
+                    android.media.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build(),
+                )
+                .setAudioFormat(
+                    android.media.AudioFormat.Builder()
+                        .setEncoding(android.media.AudioFormat.ENCODING_PCM_16BIT)
+                        .setSampleRate(sampleRate)
+                        .setChannelMask(android.media.AudioFormat.CHANNEL_OUT_MONO)
+                        .build(),
+                )
+                .setTransferMode(android.media.AudioTrack.MODE_STATIC)
+                .build()
+            if (track.state == android.media.AudioTrack.STATE_INITIALIZED) {
+                track.write(buf, 0, buf.size)
+                track.play()
+            }
+            // MODE_STATIC keeps the buffer; release after it has had time to play.
+            Thread.sleep((durationMs + 50).toLong())
+            track.release()
+        } catch (e: Exception) {
+            android.util.Log.w("BetterTuner", "reward bell failed (non-fatal): ${e.message}")
+        }
+    }, "RewardBell").start()
 }
