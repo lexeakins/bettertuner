@@ -56,7 +56,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
+import com.lexeakins.bettertuner.R
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lexeakins.bettertuner.tuner.TuneDirection
 import com.lexeakins.bettertuner.tuner.Tuning
@@ -111,7 +113,7 @@ fun TunerScreen(viewModel: TunerViewModel) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("BetterTuner", fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.app_name), fontWeight = FontWeight.Bold) },
                 actions = {
                     IconButton(onClick = { showSettings = true }) {
                         Icon(Icons.Filled.Settings, contentDescription = "Settings")
@@ -342,7 +344,7 @@ private fun RationaleScreen(onAllow: () -> Unit, onDenied: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Text("BetterTuner needs the microphone to hear your guitar.", fontSize = 20.sp, textAlign = TextAlign.Center)
+        Text("ZeroBeat needs the microphone to hear your guitar.", fontSize = 20.sp, textAlign = TextAlign.Center)
         Text("Nothing is recorded or sent anywhere. Audio is processed on your device only.", fontSize = 14.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 12.dp))
         OutlinedButton(onClick = onAllow, modifier = Modifier.padding(top = 24.dp)) { Text("Allow microphone") }
         TextButton(onClick = onDenied) { Text("Continue without mic") }
