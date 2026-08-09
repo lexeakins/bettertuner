@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lexeakins.bettertuner.audio.AudioRecordSource
 import com.lexeakins.bettertuner.audio.TonePlayer
+import com.lexeakins.bettertuner.settings.Settings
+import com.lexeakins.bettertuner.settings.SettingsStore
 import com.lexeakins.bettertuner.tuner.TuneDirection
 import com.lexeakins.bettertuner.tuner.TuneLockDetector
 import com.lexeakins.bettertuner.tuner.TunerEngine
@@ -25,10 +27,13 @@ import kotlinx.coroutines.launch
  * - Bell fires once per lock edge (via [TuneLockDetector]); on lock the string is marked tuned and, in auto
  *   mode, the UI advances to the next string (low E -> high e).
  * - Left-menu notes: tap = short preview, press-and-hold = sustained tone; release stops.
+ * - Settings (A4 reference, in-tune tolerance, theme) persist via [SettingsStore] and reshape the engine
+ *   targets/tolerance on change.
  */
 class TunerViewModel(
     private val audioSourceFactory: () -> com.lexeakins.bettertuner.audio.AudioSource = { AudioRecordSource() },
     private val tonePlayer: TonePlayer,
+    private val settingsStore: SettingsStore,
     private val inTuneCents: Float = 5f,
 ) : ViewModel() {
 
@@ -38,11 +43,21 @@ class TunerViewModel(
     private var engine: TunerEngine? = null
     private val lockDetector = TuneLockDetector()
 
+    init {
+        // Load persisted settings so the engine is built with the user's A4/tolerance from the first launch.
+        val loaded = settingsStore.get()
+        _uiState.value = _uiState.value.copy(
+            settings = loaded,
+            tuning = Tuning.byName(_uiState.value.tuning.name, loaded.a4Hz),
+        )
+    }
+
     /** Call once microphone permission is granted. Builds + starts the engine. */
     fun startEngine() {
         if (engine != null) return
+        val s = _uiState.value.settings
         val source = audioSourceFactory()
-        engine = TunerEngine(source, _uiState.value.tuning, inTuneCents, viewModelScope)
+        engine = TunerEngine(source, Tuning.byName(_uiState.value.tuning.name, s.a4Hz), s.toleranceCents, viewModelScope)
         engine!!.autoMode = _uiState.value.autoMode
         engine!!.selectedTargetIndex = _uiState.value.selectedTargetIndex
         collectEngine(engine!!)
@@ -55,11 +70,14 @@ class TunerViewModel(
     }
 
     fun setTuning(tuning: Tuning) {
-        _uiState.update { it.copy(tuning = tuning, selectedTargetIndex = 0, autoMode = true, tunedStrings = emptySet()) }
+        val s = _uiState.value.settings
+        // Rebuild targets with the current A4 reference so a changed A4 takes effect immediately.
+        val tuned = Tuning.byName(tuning.name, s.a4Hz)
+        _uiState.update { it.copy(tuning = tuned, selectedTargetIndex = 0, autoMode = true, tunedStrings = emptySet()) }
         engine?.let { eng ->
             eng.stop()
             val src = audioSourceFactory()
-            val newEngine = TunerEngine(src, tuning, inTuneCents, viewModelScope)
+            val newEngine = TunerEngine(src, tuned, s.toleranceCents, viewModelScope)
             newEngine.autoMode = true
             newEngine.selectedTargetIndex = 0
             collectEngine(newEngine)
@@ -75,19 +93,17 @@ class TunerViewModel(
                 val idx = _uiState.value.selectedTargetIndex
                 val auto = _uiState.value.autoMode
                 _uiState.update { st ->
+                    val tuned = if (bell) st.tunedStrings + idx else st.tunedStrings
                     var nextIdx = idx
                     var nextAuto = auto
-                    // On a lock edge: mark this string tuned; in auto mode, advance to the next string.
-                    val tuned = if (bell) st.tunedStrings + idx else st.tunedStrings
                     if (bell && auto) {
                         val size = st.tuning.targets.size
                         nextIdx = (idx + 1) % size
-                        nextAuto = true // stay in auto; advancing is the auto behavior
+                        nextAuto = true
                     }
                     st.copy(tuner = tunerState, rewardBell = bell, tunedStrings = tuned,
                         selectedTargetIndex = nextIdx, autoMode = nextAuto)
                 }
-                // Reflect the advance into the engine so its target tracks the UI.
                 if (bell && auto) {
                     eng.selectedTargetIndex = _uiState.value.selectedTargetIndex
                     eng.autoMode = true
@@ -120,6 +136,27 @@ class TunerViewModel(
         val size = _uiState.value.tuning.targets.size
         val next = (_uiState.value.selectedTargetIndex + delta).mod(size)
         selectString(next)
+    }
+
+    /** Persist + apply new settings (A4 reference and/or tolerance). Reshapes engine targets on change. */
+    fun updateSettings(block: Settings.() -> Settings) {
+        val next = _uiState.value.settings.block()
+        settingsStore.set(next)
+        val s = _uiState.value.copy(settings = next)
+        _uiState.value = s
+        // Rebuild the active tuning with the (possibly new) A4 so target frequencies update.
+        val tuned = Tuning.byName(_uiState.value.tuning.name, next.a4Hz)
+        _uiState.update { it.copy(tuning = tuned) }
+        engine?.let { eng ->
+            eng.stop()
+            val src = audioSourceFactory()
+            val newEngine = TunerEngine(src, tuned, next.toleranceCents, viewModelScope)
+            newEngine.autoMode = _uiState.value.autoMode
+            newEngine.selectedTargetIndex = _uiState.value.selectedTargetIndex
+            collectEngine(newEngine)
+            newEngine.start()
+            engine = newEngine
+        }
     }
 
     /** Press-and-hold center: play the current target's tone. */
@@ -167,6 +204,7 @@ data class TunerUiState(
     val selectedTargetIndex: Int = 0,
     val rewardBell: Boolean = false,
     val tunedStrings: Set<Int> = emptySet(),
+    val settings: Settings = Settings.DEFAULT,
 )
 
 val TunerState.directionLabel: String

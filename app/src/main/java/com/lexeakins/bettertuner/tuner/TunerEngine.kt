@@ -26,44 +26,57 @@ data class Tuning(
     val targets: List<Pitch>,
 ) {
     companion object {
-        /** Standard guitar tuning, E2 A2 D3 G3 B3 E4 (low E → high e). */
-        val STANDARD = Tuning(
+        /** Standard guitar tuning, E2 A2 D3 G3 B3 E4 (low E → high e). [a4Hz] sets the reference pitch. */
+        fun standard(a4Hz: Double = 440.0) = Tuning(
             "Standard",
             listOf(
-                NoteConverter.fromMidi(40),  // E2
-                NoteConverter.fromMidi(45),  // A2
-                NoteConverter.fromMidi(50),  // D3
-                NoteConverter.fromMidi(55),  // G3
-                NoteConverter.fromMidi(59),  // B3
-                NoteConverter.fromMidi(64),  // E4
+                NoteConverter.fromMidi(40, a4Hz),  // E2
+                NoteConverter.fromMidi(45, a4Hz),  // A2
+                NoteConverter.fromMidi(50, a4Hz),  // D3
+                NoteConverter.fromMidi(55, a4Hz),  // G3
+                NoteConverter.fromMidi(59, a4Hz),  // B3
+                NoteConverter.fromMidi(64, a4Hz),  // E4
             ),
         )
 
         /** Drop D: D2 A2 D3 G3 B3 E4. */
-        val DROP_D = Tuning(
+        fun dropD(a4Hz: Double = 440.0) = Tuning(
             "Drop D",
             listOf(
-                NoteConverter.fromMidi(38),  // D2
-                NoteConverter.fromMidi(45),  // A2
-                NoteConverter.fromMidi(50),  // D3
-                NoteConverter.fromMidi(55),  // G3
-                NoteConverter.fromMidi(59),  // B3
-                NoteConverter.fromMidi(64),  // E4
+                NoteConverter.fromMidi(38, a4Hz),  // D2
+                NoteConverter.fromMidi(45, a4Hz),  // A2
+                NoteConverter.fromMidi(50, a4Hz),  // D3
+                NoteConverter.fromMidi(55, a4Hz),  // G3
+                NoteConverter.fromMidi(59, a4Hz),  // B3
+                NoteConverter.fromMidi(64, a4Hz),  // E4
             ),
         )
 
         /** DADGAD. */
-        val DADGAD = Tuning(
+        fun dadgad(a4Hz: Double = 440.0) = Tuning(
             "DADGAD",
             listOf(
-                NoteConverter.fromMidi(38),  // D2
-                NoteConverter.fromMidi(45),  // A2
-                NoteConverter.fromMidi(50),  // D3
-                NoteConverter.fromMidi(55),  // G3
-                NoteConverter.fromMidi(57),  // A3
-                NoteConverter.fromMidi(62),  // D4
+                NoteConverter.fromMidi(38, a4Hz),  // D2
+                NoteConverter.fromMidi(45, a4Hz),  // A2
+                NoteConverter.fromMidi(50, a4Hz),  // D3
+                NoteConverter.fromMidi(55, a4Hz),  // G3
+                NoteConverter.fromMidi(57, a4Hz),  // A3
+                NoteConverter.fromMidi(62, a4Hz),  // D4
             ),
         )
+
+        /** Convenience defaults at A4 = 440 Hz (kept for existing call sites). */
+        val STANDARD: Tuning get() = standard()
+        val DROP_D: Tuning get() = dropD()
+        val DADGAD: Tuning get() = dadgad()
+
+        /** Build a tuning by its display name with the given A4 reference (default 440). */
+        fun byName(name: String, a4Hz: Double = 440.0): Tuning = when (name) {
+            "Standard" -> standard(a4Hz)
+            "Drop D" -> dropD(a4Hz)
+            "DADGAD" -> dadgad(a4Hz)
+            else -> standard(a4Hz)
+        }
     }
 }
 

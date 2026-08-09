@@ -215,3 +215,20 @@ Bug reports follow a tight, reproducible harness. Each entry: symptom, root caus
     green check overlay at the right — whole-guitar progress as you tune.
 - **Regression test:** none automated (visual HITL). Re-test checks #4/#5/#6 + new progress visuals pending HITL.
 - **Status:** FIXED (2026-08-09) — pending HITL re-verify.
+
+## BT-019 — Settings were a non-functional stub
+- **Reported:** 2026-08-09 (Slice 3 polish follow-up: "make the settings do things").
+- **Root cause:** `SettingsScreen` only printed static text ("A4 reference: 440 Hz", etc.); nothing was wired to
+  engine state or persisted.
+- **Fix:**
+  - `NoteConverter` A4 made configurable (`fromFrequency`/`midiToFrequency`/`fromMidi` accept `a4Hz`).
+  - `Tuning` builders take `a4Hz` (`standard/dropD/dadgad` + `byName`); `STANDARD/DROP_D/DADGAD` kept as 440 defaults.
+  - New `settings` package: `Settings` model (a4Hz, toleranceCents, theme) + `SettingsStore` (SharedPreferences
+    impl, injectable). `ThemeMode` enum (SYSTEM/LIGHT/DARK).
+  - `TunerViewModel.updateSettings { }` persists via the store and rebuilds the engine with the new A4/tolerance
+    (reshapes target frequencies; stricter/looser in-tune gate).
+  - `MainActivity` applies `theme` via light/dark ColorScheme; `TunerScreen.SettingsScreen` is now real: A4
+    slider (400–460 Hz), tolerance slider (1–20¢), theme segmented control. Preferences persist across launches.
+- **Regression test:** `TunerViewModelCycleTest.updateSettings_persistsAndReshapesTargets` asserts A4=432 -> E2=80.9 Hz
+  and tolerance persists. JVM suite green.
+- **Status:** FIXED (2026-08-09) — pending HITL re-verify (sliders feel, theme applies, persistence survives restart).

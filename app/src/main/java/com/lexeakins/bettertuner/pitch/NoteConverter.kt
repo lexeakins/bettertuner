@@ -29,12 +29,16 @@ object NoteConverter {
      * @return [Pitch] describing the nearest note and how sharp (positive) or flat (negative) it is in cents.
      * @throws IllegalArgumentException if [frequencyHz] is not positive.
      */
-    fun fromFrequency(frequencyHz: Double): Pitch {
+    /**
+     * Returns the nearest note to [frequencyHz] and the cents offset from that note, using the given
+     * [a4Hz] reference (default 440). Overload keeps the original call sites unchanged.
+     */
+    fun fromFrequency(frequencyHz: Double, a4Hz: Double = A4_HZ): Pitch {
         require(frequencyHz > 0.0) { "Frequency must be positive, was $frequencyHz" }
 
-        val midiFloat = A4_MIDI + 12 * log2(frequencyHz / A4_HZ)
+        val midiFloat = A4_MIDI + 12 * log2(frequencyHz / a4Hz)
         val nearestMidi = midiFloat.roundToInt()
-        val targetHz = A4_HZ * 2.0.pow((nearestMidi - A4_MIDI) / 12.0)
+        val targetHz = a4Hz * 2.0.pow((nearestMidi - A4_MIDI) / 12.0)
         val cents = 1200 * log2(frequencyHz / targetHz)
 
         val octave = nearestMidi / 12 - 1
@@ -42,16 +46,15 @@ object NoteConverter {
         return Pitch(NAMES[nameIndex], octave, cents, frequencyHz, nearestMidi)
     }
 
-    /** The exact frequency of a given MIDI note number. */
-    fun midiToFrequency(midi: Int): Double = A4_HZ * 2.0.pow((midi - A4_MIDI) / 12.0)
+    /** The exact frequency of a given MIDI note number, using the given [a4Hz] reference (default 440). */
+    fun midiToFrequency(midi: Int, a4Hz: Double = A4_HZ): Double = a4Hz * 2.0.pow((midi - A4_MIDI) / 12.0)
 
     /**
-     * Builds an exact [Pitch] for a MIDI note (no rounding). Use this for tuning *targets*, where the
-     * intended octave must be explicit — [fromFrequency] would snap to the nearest chromatic note and
-     * could mis-octave a target like A3 (220 Hz) down to A2.
+     * Builds an exact [Pitch] for a MIDI note (no rounding), using the given [a4Hz] reference.
+     * Use this for tuning *targets*, where the intended octave must be explicit.
      */
-    fun fromMidi(midi: Int): Pitch {
-        val targetHz = midiToFrequency(midi)
+    fun fromMidi(midi: Int, a4Hz: Double = A4_HZ): Pitch {
+        val targetHz = midiToFrequency(midi, a4Hz)
         val octave = midi / 12 - 1
         val nameIndex = ((midi % 12) + 12) % 12
         return Pitch(NAMES[nameIndex], octave, 0.0, targetHz, midi)

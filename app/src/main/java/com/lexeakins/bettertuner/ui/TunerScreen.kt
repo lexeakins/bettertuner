@@ -20,11 +20,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuItem
+import com.lexeakins.bettertuner.settings.Settings
+import com.lexeakins.bettertuner.settings.ThemeMode
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.Icon
@@ -32,6 +37,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -96,8 +102,11 @@ fun TunerScreen(viewModel: TunerViewModel) {
 
     if (showSettings) {
         SettingsScreen(
+            settings = ui.settings,
+            onA4Change = { viewModel.updateSettings { copy(a4Hz = Settings.clampA4(it)) } },
+            onToleranceChange = { viewModel.updateSettings { copy(toleranceCents = Settings.clampTolerance(it)) } },
+            onThemeChange = { viewModel.updateSettings { copy(theme = it) } },
             onBack = { showSettings = false },
-            onTheme = { /* theme persists via DataStore/Settings; v1: restart not required */ },
         )
         return
     }
@@ -352,13 +361,67 @@ private fun RationaleScreen(onAllow: () -> Unit, onDenied: () -> Unit) {
 }
 
 @Composable
-private fun SettingsScreen(onBack: () -> Unit, onTheme: () -> Unit) {
-    Column(Modifier.fillMaxSize().padding(24.dp)) {
+private fun SettingsScreen(
+    settings: Settings,
+    onA4Change: (Double) -> Unit,
+    onToleranceChange: (Float) -> Unit,
+    onThemeChange: (ThemeMode) -> Unit,
+    onBack: () -> Unit,
+) {
+    Column(
+        Modifier.fillMaxSize().padding(24.dp).verticalScroll(rememberScrollState()),
+    ) {
         Text("Settings", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-        Text("Theme: System (Light/Dark toggle — coming in Settings v2)", fontSize = 16.sp, modifier = Modifier.padding(top = 16.dp))
-        Text("A4 reference: 440 Hz", fontSize = 16.sp, modifier = Modifier.padding(top = 8.dp))
-        Text("In-tune tolerance: ±5 cents", fontSize = 16.sp, modifier = Modifier.padding(top = 8.dp))
-        OutlinedButton(onClick = onBack, modifier = Modifier.padding(top = 24.dp)) { Text("Back") }
+        Text("ZeroBeat is free, offline, and collects no data. These preferences are stored only on this device.",
+            fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+
+        Spacer(Modifier.height(24.dp))
+        Text("Reference pitch (A4)", fontSize = 16.sp, fontWeight = FontWeight.Medium)
+        Text("%.0f Hz".format(settings.a4Hz), fontSize = 28.sp, fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(vertical = 4.dp))
+        Slider(
+            value = settings.a4Hz.toFloat(),
+            onValueChange = { onA4Change(it.toDouble()) },
+            valueRange = 400f..460f,
+            steps = 60,
+        )
+        Text("Concert pitch. 440 Hz is standard; some groups tune to 432 or 442.", fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+        Spacer(Modifier.height(24.dp))
+        Text("In-tune tolerance", fontSize = 16.sp, fontWeight = FontWeight.Medium)
+        Text("± %.0f cents".format(settings.toleranceCents), fontSize = 28.sp, fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(vertical = 4.dp))
+        Slider(
+            value = settings.toleranceCents,
+            onValueChange = { onToleranceChange(it) },
+            valueRange = 1f..20f,
+            steps = 19,
+        )
+        Text("How close a note must be to count as in tune. Tighter = stricter.", fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+        Spacer(Modifier.height(24.dp))
+        Text("Appearance", fontSize = 16.sp, fontWeight = FontWeight.Medium)
+        Row(
+            Modifier.fillMaxWidth().padding(top = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            for (mode in ThemeMode.values()) {
+                val selected = settings.theme == mode
+                OutlinedButton(
+                    onClick = { onThemeChange(mode) },
+                    modifier = Modifier.weight(1f),
+                    colors = if (selected) ButtonDefaults.outlinedButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer) else ButtonDefaults.outlinedButtonColors(),
+                ) {
+                    Text(mode.name.replaceFirstChar { it.uppercase() })
+                }
+            }
+        }
+
+        Spacer(Modifier.height(32.dp))
+        OutlinedButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text("Back") }
     }
 }
 
