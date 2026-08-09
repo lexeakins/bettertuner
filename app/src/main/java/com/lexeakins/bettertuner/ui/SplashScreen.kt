@@ -33,12 +33,12 @@ fun SplashScreen() {
     ) {
         Image(
             painter = painterResource(R.drawable.ic_launcher_foreground),
-            contentDescription = "InTune",
+            contentDescription = "ZeroBeat",
             modifier = Modifier.size(160.dp),
         )
         Spacer(Modifier.height(16.dp))
         Text(
-            "InTune",
+            "ZeroBeat",
             fontSize = 40.sp,
             fontWeight = FontWeight.Bold,
             color = Color(0xFF2E7D32),
