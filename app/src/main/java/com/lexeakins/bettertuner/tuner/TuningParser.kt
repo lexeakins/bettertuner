@@ -45,6 +45,10 @@ object TuningParser {
         if (fields.size != 6) {
             return ParseResult(null, "Enter exactly 6 notes (low E to high e).", emptyList())
         }
+        // Blank fields mean "not entered yet" — incomplete, not an error. Caller disables Apply but shows no red text.
+        if (fields.any { it.isBlank() }) {
+            return ParseResult(null, null, emptyList())
+        }
         val pitches = mutableListOf<Pitch>()
         for (raw in fields) {
             val p = NoteConverter.parseNote(raw, a4Hz)

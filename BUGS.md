@@ -306,3 +306,15 @@ Bug reports follow a tight, reproducible harness. Each entry: symptom, root caus
      warning). Fixed by surfacing each field's Standard baseline ("String 6 (low) · std E2") so the comparison
      is obvious. Re-verify via HITL-2026-08-09b.
 - **Regression tests added:** `byName_maps_all_presets`, `warning_tuningUpTwoSemitones_soft_is_visible`.
+
+## BT-025 — Custom dialog shows red error on empty/unfinished input
+- **Reported:** 2026-08-09 (HITL-2026-08-09b, user image) — opening the Custom dialog (or after cancel/reopen)
+  showed a red "Invalid note / enter exactly 6 notes" error immediately, even before typing. Persisted on retry.
+- **Root cause:** `TuningParser.parse` treated blank fields as a hard error ("exactly 6 notes"), so the dialog's
+  bottom error banner (`if (result.error != null)`) fired on first open / whenever any field was still empty.
+- **Fix:** blank fields are now "incomplete, not an error" — `parse` returns `pitches=null` but `error=null` when
+  any field is blank. Only a *non-blank but malformed* note (e.g. "X3") sets `error`. Apply stays correctly
+  disabled until all 6 are valid; no red text while the user is still entering. `isError` on each field already
+  gated on `value.isNotBlank()`, so empty fields never show error state.
+- **Regression test:** `parse_blankNote_isIncomplete_notError` (asserts ok=false AND error=null for a blank field).
+- **Status:** FIXED (2026-08-09) — pending HITL re-verify.

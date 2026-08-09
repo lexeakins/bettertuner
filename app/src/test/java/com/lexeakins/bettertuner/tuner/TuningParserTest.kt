@@ -42,9 +42,11 @@ class TuningParserTest {
     }
 
     @Test
-    fun parse_blankNote_fails() {
+    fun parse_blankNote_isIncomplete_notError() {
+        // Blank fields mean "not entered yet": parse fails (ok=false) but must NOT set a red error message.
         val r = TuningParser.parse(listOf("E2", "A2", "", "G3", "B3", "E4"))
         assertFalse(r.ok)
+        assertNull(r.error) // no scary red text while the user is still filling in
     }
 
     @Test
