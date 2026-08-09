@@ -34,7 +34,13 @@ class AudioTrackTonePlayer : TonePlayer {
             val buf = ShortArray(n)
             for (i in 0 until n) {
                 val t = i.toDouble() / sampleRate
-                buf[i] = (kotlin.math.sin(2 * Math.PI * frequencyHz * t) * 0.6 * Short.MAX_VALUE).toInt().toShort()
+                // Smooth attack/release across the loop window so each repeat fades in/out (no clicks,
+                // no harsh on/off). Gentle 2nd-harmonic adds a touch of warmth vs a pure sine.
+                val env = kotlin.math.sin(Math.PI * i / n) // 0 -> 1 -> 0 across the buffer
+                val fundamental = kotlin.math.sin(2 * Math.PI * frequencyHz * t)
+                val harmonic = 0.25 * kotlin.math.sin(2 * Math.PI * 2 * frequencyHz * t)
+                val sample = (fundamental + harmonic) * env * 0.35 // lower overall level
+                buf[i] = (sample * Short.MAX_VALUE).toInt().toShort()
             }
             val at = AudioTrack.Builder()
                 .setAudioAttributes(

@@ -45,7 +45,7 @@ class TunerViewModel(
         engine!!.selectedTargetIndex = _uiState.value.selectedTargetIndex
         viewModelScope.launch {
             engine!!.state.collect { tunerState ->
-                val bell = lockDetector.onState(tunerState)
+                val bell = lockDetector.onState(tunerState.inTune, tunerState.cents, System.currentTimeMillis())
                 _uiState.update { it.copy(tuner = tunerState, rewardBell = bell) }
             }
         }
@@ -74,7 +74,7 @@ class TunerViewModel(
     private fun collectEngine(eng: TunerEngine) {
         viewModelScope.launch {
             eng.state.collect { tunerState ->
-                val bell = lockDetector.onState(tunerState)
+                val bell = lockDetector.onState(tunerState.inTune, tunerState.cents, System.currentTimeMillis())
                 _uiState.update { it.copy(tuner = tunerState, rewardBell = bell) }
             }
         }
@@ -111,6 +111,19 @@ class TunerViewModel(
     }
 
     fun stopReferenceTone() = tonePlayer.stop()
+
+    /** Preview/sustain a specific pitch's tone from the left-menu note (tap = short, hold = sustained). */
+    fun startToneForPitch(frequencyHz: Double) = tonePlayer.start(frequencyHz)
+
+    /** Tap preview: play the pitch briefly (~350ms) then stop, so a tap doesn't leave a dangling tone. */
+    fun previewTone(frequencyHz: Double) {
+        tonePlayer.start(frequencyHz)
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(350)
+            tonePlayer.stop()
+        }
+    }
+
 
     fun consumeRewardBell(): Boolean {
         val fire = _uiState.value.rewardBell

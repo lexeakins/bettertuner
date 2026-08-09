@@ -155,7 +155,7 @@ To test on your phone:
   Steps: Uninstall + run → tap Don't allow. ✅ if app stays on the tuner screen (no readout) with an
   "Enable mic" button; tapping it opens system App Info / mic settings. No crash either way.
 
-- [ ] **3. Pluck low E → big "E2", needle centers green within ±5¢, bell dings once on lock**  · *phone only*  · ⏳ re-test
+- [ ] **3. Pluck low E → big "E2", needle centers green within ±5¢, bell dings once on lock**  · *phone only*  · ⏳ re-test (BT-012: hysteresis fixes threshold chatter)
   Steps: On phone, pluck low E. ✅ if the large note reads "E2", the needle sits in the green center band,
   and the reward bell sounds a single satisfying ding the moment it locks (not every frame).
 
@@ -163,13 +163,13 @@ To test on your phone:
   Steps: Use the top tuning selector. ✅ if the left EADGBE strip updates (Drop D shows D low; DADGAD shows
   its 6 targets) and auto mode targets within the chosen tuning.
 
-- [x] **5. Swipe up/down + left/right cycles strings; tap a letter jumps**  · *emulator or phone*  · ⏳ RE-VERIFY (BT-011: swipes were unwired; re-test after fix)
+- [x] **5. Swipe up/down + left/right cycles strings; tap a letter jumps**  · *emulator or phone*  · ⏳ RE-VERIFY (BT-013: tone moved off center so swipes cycle cleanly)
   Steps: On the left strip, swipe up/down and left/right; tap a letter (e.g. "G"). ✅ if the selected
   target changes accordingly in all three ways; manual pick flips the mode toggle to Manual.
 
-- [ ] **6. Center-tap plays target tone; release stops**  · *phone only (needs audio out + in)*  · ⏳ re-test (BT-011: tone handler was never wired; now fixed)
-  Steps: On phone, press-and-hold the screen center while tuning a string. ✅ if you hear the target
-  note's tone while held and it stops on release. (Distinct from the lock-in bell.)
+- [ ] **6. Left-note tap = tone preview; hold = sustained tone; release stops**  · *phone only*  · ⏳ re-test (BT-013: tone moved to left-menu notes)
+  Steps: On phone, tap a left-strip note → short tone preview; press-and-hold → sustained tone until release.
+  (Distinct from the lock-in bell.)
 
 - [x] **7. Theme toggle (Light/Dark/System) applies**  · *emulator or phone*  · ✅ 2026-08-09 (System default; explicit toggle is a Slice 4 stub)
   Steps: Settings (gear) → Theme. ✅ if the screen recolors live and the choice persists on restart.

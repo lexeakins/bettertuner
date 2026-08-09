@@ -137,3 +137,27 @@ Bug reports follow a tight, reproducible harness. Each entry: symptom, root caus
 - **Regression test:** none automated (gesture+audio are HITL/device); verified by building + instrumented
   audio-output probe (passes on real phone). Re-test checks #5/#6 pending user HITL.
 - **Status:** FIXED (2026-08-09) — pending HITL re-verify.
+
+## BT-012 — Bell chattered at the in-tune threshold (no hysteresis)
+- **Reported:** 2026-08-09 (Slice 3 HITL: "it plays sometimes multiple times fast when ... on the edge ...
+  back and forth between in tune and flat/sharp").
+- **Root cause:** `TuneLockDetector.onState(tunerState)` fired on *every* re-entry into the ±5¢ band, so a
+  reading jittering across the threshold dinged repeatedly.
+- **Fix:** Added **hysteresis** — once locked, the string must exceed tolerance + a 4¢ deadband
+  (`|cents| > 9¢`) before it can unlock and re-trigger. Signature became `onState(inTune, cents, now)`; the
+  ViewModel passes `tunerState.inTune` + `tunerState.cents`.
+- **Regression test:** `TuneLockDetectorTest.hysteresisPreventsThresholdChatter` + `hysteresisStaysLockedWithinDeadband`.
+- **Status:** FIXED (2026-08-09).
+
+## BT-013 — Tone placement hijacked swipes; harsh timbre
+- **Reported:** 2026-08-09 (Slice 3 HITL: check #5 fail — swiping the strip played the long-press tone instead
+  of cycling; check #6 tone "unpleasant / aggressive, high attack").
+- **Root cause:** (a) center readout's `pointerInput` fired `startReferenceTone()` on any touch, so a swipe
+  gesture on the strip was read as a long-press and played the tone, blocking the swipe. (b) The reference
+  tone was a raw sine at 0.6 amplitude with an abrupt on/off — harsh.
+- **Fix (per user):** moved the tone OFF the center readout. Left-menu notes now do **tap = short preview
+  (~350ms)** and **press-and-hold = sustained tone** (onRelease stops). Swipes on the strip cycle cleanly with
+  no tone. Tone timbre softened: 0.35 amplitude, a `sin(π·i/n)` attack/release envelope across each loop
+  buffer (no clicks), plus a gentle 2nd harmonic for warmth.
+- **Regression test:** none automated (gesture/audio HITL). Re-test checks #5/#6 pending user HITL.
+- **Status:** FIXED (2026-08-09) — pending HITL re-verify.

@@ -120,14 +120,17 @@ fun TunerScreen(viewModel: TunerViewModel) {
                 selectedIndex = ui.selectedTargetIndex,
                 onSelect = { viewModel.selectString(it) },
                 onCycle = { viewModel.cycleString(it) },
+                onPreviewTone = { viewModel.previewTone(it) },
+                onHoldTone = { viewModel.startToneForPitch(it) },
+                onReleaseTone = { viewModel.stopReferenceTone() },
                 modifier = Modifier
                     .align(Alignment.CenterStart)
                     .fillMaxHeight(0.8f)
                     .width(72.dp),
             )
 
-            // CENTER: big note + needle + freq compare, wrapped in a tap-hold zone that plays the
-            // target reference tone while held (released -> stops).
+            // CENTER: big note + needle + freq compare. No tone here — tone lives on the left-menu notes
+            // (tap/hold) so swipes on the strip are never hijacked by a long-press.
             Column(
                 Modifier
                     .fillMaxSize()
@@ -136,26 +139,14 @@ fun TunerScreen(viewModel: TunerViewModel) {
                 verticalArrangement = Arrangement.Center,
             ) {
                 val t = ui.tuner
-                Box(
+                Column(
                     Modifier
                         .fillMaxWidth()
-                        .weight(1f)
-                        .pointerInput(Unit) {
-                            detectTapGestures(
-                                onPress = {
-                                    try {
-                                        viewModel.startReferenceTone()
-                                        awaitRelease()
-                                    } finally {
-                                        viewModel.stopReferenceTone()
-                                    }
-                                },
-                            )
-                        },
-                    contentAlignment = Alignment.Center,
+                        .weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
+                    Text(
                             t.detected?.label ?: "—",
                             fontSize = 120.sp,
                             fontWeight = FontWeight.Bold,
@@ -199,7 +190,6 @@ fun TunerScreen(viewModel: TunerViewModel) {
             }
         }
     }
-}
 
 @Composable
 private fun NeedleGauge(deflection: Float, inTune: Boolean) {
@@ -228,6 +218,9 @@ private fun StringStrip(
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
     onCycle: (Int) -> Unit,
+    onPreviewTone: (Double) -> Unit,
+    onHoldTone: (Double) -> Unit,
+    onReleaseTone: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     // Plain Column (NOT LazyColumn) so it doesn't consume drags for scrolling. Swipe accumulates offset
@@ -264,6 +257,20 @@ private fun StringStrip(
                     .fillMaxWidth()
                     .padding(4.dp)
                     .clip(RoundedCornerShape(8.dp))
+                    // Tap = short preview of this note; press-and-hold = sustained tone until release.
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onTap = { onPreviewTone(target.frequencyHz) },
+                            onPress = {
+                                try {
+                                    onHoldTone(target.frequencyHz)
+                                    awaitRelease()
+                                } finally {
+                                    onReleaseTone()
+                                }
+                            },
+                        )
+                    }
                     .clickable { onSelect(i) },
             ) {
                 Text(
