@@ -232,3 +232,19 @@ Bug reports follow a tight, reproducible harness. Each entry: symptom, root caus
 - **Regression test:** `TunerViewModelCycleTest.updateSettings_persistsAndReshapesTargets` asserts A4=432 -> E2=80.9 Hz
   and tolerance persists. JVM suite green.
 - **Status:** FIXED (2026-08-09) — pending HITL re-verify (sliders feel, theme applies, persistence survives restart).
+
+## BT-020 — Auto-advance fired on a single transient frame (wrong/early string lock)
+- **Reported:** 2026-08-09 (HITL: while tuning one string and re-plucking to confirm, auto mode advanced to the
+  next string; sometimes it locked the *wrong* string as in-tune, e.g. plucking low E but it decided A was tuned).
+- **Root cause:** `collectEngine` advanced + dinged the instant `inTune` became true for one frame. A transient
+  lock (re-pluck, harmonic, or a different auto-selected target briefly reading in-tune) advanced immediately.
+- **Fix:** replaced the single-frame lock with a **stable-dwell confirmation**. `inTuneSinceMs` accumulates while
+  the current target is continuously in tune; a string is only marked tuned + advanced + dinged after `DWELL_MS`
+  (600ms) of uninterrupted in-tune. Leaving tune (or the target changing) resets the timer, so a wrong-string or
+  one-frame lock can't accumulate the dwell. `lockProgress` (0..1) is exposed and shown as a settling bar on the
+  selected note so the user sees confirmation happening before the advance. `TuneLockDetector` is no longer used
+  by the VM (kept + still unit-tested).
+- **Regression test:** logic is timing/flow-based; covered by HITL (re-pluck to confirm no early advance, wrong
+  string no longer falsely locks). Consider a VM test driving the engine with synthetic in-tune frames < DWELL_MS
+  to assert no advance.
+- **Status:** FIXED (2026-08-09) — pending HITL re-verify.

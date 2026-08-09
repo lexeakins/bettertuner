@@ -41,7 +41,14 @@ class TunerViewModel(
     val uiState: StateFlow<TunerUiState> = _uiState.asStateFlow()
 
     private var engine: TunerEngine? = null
-    private val lockDetector = TuneLockDetector()
+
+    /**
+     * Continuous in-tune timestamp (ms) for the *current* target. A string counts as confirmed only after it
+     * stays in tune uninterrupted for [DWELL_MS] — this prevents a single-frame or wrong-string transient from
+     * advancing auto mode. Reset whenever the target changes or we leave tune.
+     */
+    private var inTuneSinceMs: Long? = null
+    private val DWELL_MS = 600L
 
     init {
         // Load persisted settings so the engine is built with the user's A4/tolerance from the first launch.
@@ -55,6 +62,7 @@ class TunerViewModel(
     /** Call once microphone permission is granted. Builds + starts the engine. */
     fun startEngine() {
         if (engine != null) return
+        inTuneSinceMs = null
         val s = _uiState.value.settings
         val source = audioSourceFactory()
         engine = TunerEngine(source, Tuning.byName(_uiState.value.tuning.name, s.a4Hz), s.toleranceCents, viewModelScope)
@@ -73,6 +81,7 @@ class TunerViewModel(
         val s = _uiState.value.settings
         // Rebuild targets with the current A4 reference so a changed A4 takes effect immediately.
         val tuned = Tuning.byName(tuning.name, s.a4Hz)
+        inTuneSinceMs = null
         _uiState.update { it.copy(tuning = tuned, selectedTargetIndex = 0, autoMode = true, tunedStrings = emptySet()) }
         engine?.let { eng ->
             eng.stop()
@@ -89,22 +98,43 @@ class TunerViewModel(
     private fun collectEngine(eng: TunerEngine) {
         viewModelScope.launch {
             eng.state.collect { tunerState ->
-                val bell = lockDetector.onState(tunerState.inTune, tunerState.cents, System.currentTimeMillis())
+                val now = System.currentTimeMillis()
                 val idx = _uiState.value.selectedTargetIndex
                 val auto = _uiState.value.autoMode
+
+                // A string is "settling" when the current target is continuously in tune. Accumulate time; only
+                // confirm (mark tuned + advance + ding) after a stable DWELL_MS. A transient/wrong-string lock
+                // can't accumulate — it leaves tune within a frame or two, resetting the timer.
+                val stablyInTune = tunerState.inTune && tunerState.target != null
+                if (stablyInTune) {
+                    if (inTuneSinceMs == null) inTuneSinceMs = now
+                } else {
+                    inTuneSinceMs = null
+                }
+                val elapsed = inTuneSinceMs?.let { now - it } ?: 0L
+                val lockProgress = (elapsed.toFloat() / DWELL_MS).coerceIn(0f, 1f)
+                val confirmed = auto && stablyInTune && elapsed >= DWELL_MS
+
                 _uiState.update { st ->
-                    val tuned = if (bell) st.tunedStrings + idx else st.tunedStrings
+                    val tuned = if (confirmed) st.tunedStrings + idx else st.tunedStrings
                     var nextIdx = idx
                     var nextAuto = auto
-                    if (bell && auto) {
+                    if (confirmed) {
                         val size = st.tuning.targets.size
                         nextIdx = (idx + 1) % size
                         nextAuto = true
+                        inTuneSinceMs = null
                     }
-                    st.copy(tuner = tunerState, rewardBell = bell, tunedStrings = tuned,
-                        selectedTargetIndex = nextIdx, autoMode = nextAuto)
+                    st.copy(
+                        tuner = tunerState,
+                        rewardBell = confirmed,
+                        tunedStrings = tuned,
+                        selectedTargetIndex = nextIdx,
+                        autoMode = nextAuto,
+                        lockProgress = lockProgress,
+                    )
                 }
-                if (bell && auto) {
+                if (confirmed) {
                     eng.selectedTargetIndex = _uiState.value.selectedTargetIndex
                     eng.autoMode = true
                 }
@@ -113,12 +143,14 @@ class TunerViewModel(
     }
 
     fun setAutoMode(auto: Boolean) {
+        inTuneSinceMs = null
         _uiState.update { it.copy(autoMode = auto) }
         engine?.autoMode = auto
     }
 
     /** Manual string pick: selects the target and drops out of auto mode. */
     fun selectString(index: Int) {
+        inTuneSinceMs = null
         val max = _uiState.value.tuning.targets.lastIndex
         val idx = index.coerceIn(0, max)
         _uiState.update { it.copy(selectedTargetIndex = idx, autoMode = false) }
@@ -205,6 +237,8 @@ data class TunerUiState(
     val rewardBell: Boolean = false,
     val tunedStrings: Set<Int> = emptySet(),
     val settings: Settings = Settings.DEFAULT,
+    /** 0..1 progress toward confirming the current target in tune (auto mode dwell). For a "settling" cue. */
+    val lockProgress: Float = 0f,
 )
 
 val TunerState.directionLabel: String

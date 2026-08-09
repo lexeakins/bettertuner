@@ -54,6 +54,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.background
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -168,6 +169,7 @@ fun TunerScreen(viewModel: TunerViewModel) {
                     tuning = ui.tuning,
                     selectedIndex = ui.selectedTargetIndex,
                     tunedStrings = ui.tunedStrings,
+                    lockProgress = ui.lockProgress,
                     onSelect = { viewModel.selectString(it) },
                     onPreviewTone = { viewModel.previewTone(it) },
                     onHoldTone = { viewModel.startToneForPitch(it) },
@@ -255,6 +257,7 @@ private fun StringStrip(
     tuning: Tuning,
     selectedIndex: Int,
     tunedStrings: Set<Int>,
+    lockProgress: Float = 0f,
     onSelect: (Int) -> Unit,
     onPreviewTone: (Double) -> Unit,
     onHoldTone: (Double) -> Unit,
@@ -316,6 +319,17 @@ private fun StringStrip(
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
                             .padding(end = 6.dp),
+                    )
+                }
+                // Settling bar: fills across the bottom of the *selected* note as it dwells in tune,
+                // so you can see the app is confirming before it advances (not jumping early).
+                if (selected && lockProgress > 0.01f && !tuned) {
+                    Box(
+                        Modifier
+                            .align(Alignment.BottomStart)
+                            .fillMaxWidth(lockProgress.coerceIn(0f, 1f))
+                            .height(3.dp)
+                            .background(Color(0xFF2E7D32)),
                     )
                 }
             }
