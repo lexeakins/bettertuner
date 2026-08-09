@@ -16,7 +16,7 @@ This is the **human-in-the-loop (HITL) test log**. It complements the automated 
 | Slice | What | Commit | Status |
 |-------|------|--------|--------|
 | 0 | Project scaffold + pitch core + unit tests | `c71e67f` | automated ✓ / HITL n/a |
-| 1 | Audio capture seam (`AudioSource` + `AudioRecordSource` + `FakeAudioSource`) | `805619e` | HITL ⏳ blocked (no device) |
+| 1 | Audio capture seam (`AudioSource` + `AudioRecordSource` + `FakeAudioSource`) | `805619e` | HITL ✅ launched (BT-005 fixed) / ⏳ mic checks need UI |
 | 2 | TunerEngine (`StateFlow<Pitch?>`, wires capture → detector → note) | — | not started |
 
 ---
@@ -56,7 +56,7 @@ the pipeline recovers a known note from a synthetic tone (already covered by JVM
 
 **Prereq:** complete the 🔧 One-time setup above (at least D — have a runnable device).
 
-- [ ] **1. App installs and launches without crashing**
+- [x] **1. App installs and launches without crashing** (verified 2026-08-09 on Pixel 10 Pro emulator via adb; BT-005 fixed)
   Steps: With the project open in Android Studio, select your device in the dropdown and click **▶ Run**.
   Wait for "Launch succeeded" in the build output. Confirm the app opens (blank screen is fine for now).
   ✅ if it launches; ❌ if it crashes or shows a red error.

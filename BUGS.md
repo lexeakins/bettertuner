@@ -37,3 +37,16 @@ Bug reports follow a tight, reproducible harness. Each entry: symptom, root caus
   `androidx.test.ext:junit` line (1.2.1). Needed a separate `testRules` version in the catalog.
 - **Regression test:** `AudioRecordSourceTest` compiles (GrantPermissionRule resolves).
 - **Status:** FIXED (2026-08-09).
+
+## BT-005 — App crashed on launch: missing `MainActivity`
+- **Reported:** 2026-08-09 (Slice 1 HITL, Pixel 10 Pro emulator — "BetterTuner keeps stopping")
+- **Symptom:** Launch shows "BetterTuner keeps stopping"; `adb logcat -b crash` shows
+  `java.lang.ClassNotFoundException: Didn't find class "com.lexeakins.bettertuner.MainActivity"`.
+- **Root cause:** `AndroidManifest.xml` declared a launcher `.MainActivity` but the class was never written
+  (the manifest was committed before the UI slice existed). The activity couldn't instantiate.
+- **Fix:** Added `MainActivity.kt` — `ComponentActivity` with `setContent`, a `MaterialTheme`/`Surface`
+  scaffold and a launch-safe placeholder Compose screen. Build + install + launch verified on the emulator
+  via `adb` (FATAL count 0, pid running).
+- **Regression test:** JVM suite can't cover this (it's an Android runtime wiring issue). Covered by the
+  HITL checklist (Slice 1 check #1). Blocker: a manifest must never declare a component that isn't shipped.
+- **Status:** FIXED (2026-08-09).
