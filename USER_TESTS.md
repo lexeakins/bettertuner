@@ -26,7 +26,7 @@ This is the **human-in-the-loop (HITL) test log**. It complements the automated 
 |-------|------|--------|--------|
 | 0 | Project scaffold + pitch core + unit tests | `c71e67f` | automated ✓ / HITL n/a |
 | 1 | Audio capture seam (`AudioSource` + `AudioRecordSource` + `FakeAudioSource`) | `805619e` | HITL ✅ launched (BT-005 fixed) / ⏳ mic checks need UI |
-| 2 | TunerEngine — `StateFlow<TunerState>` (capture→YIN→note; modes + tunings) | `pending` | not started |
+| 2 | TunerEngine — `StateFlow<TunerState>` (capture→YIN→note; modes + tunings) | `ee50739` | HITL ✅ check #3 (testDebugUnitTest green, 26 tests, 2026-08-09); #1/#2 ⏳ blocked on UI |
 
 ---
 
@@ -96,6 +96,28 @@ the pipeline recovers a known note from a synthetic tone (already covered by JVM
 > ⏳ **Blocked:** checks 2 & 4 activate once the UI requests mic permission (Slice 3). Check 3 needs a device
 > with audio. HITL checks need a target. Once you have an AVD or a phone with USB debugging, run
 > `./gradlew connectedDebugAndroidTest` and report back.
+
+---
+
+## Slice 2 — TunerEngine (commit `ee50739`)
+**Goal:** verify the capture→detection→note pipeline + modes + tunings behave; the engine exposes
+`StateFlow<TunerState>` (detected, target, cents, direction, inTune).
+
+**Prereq:** device from setup (D). Slice 2 has no UI, so only the logic-on-device path is HITL-relevant;
+visual checks come in Slice 3.
+
+- [⏳] **1. App launches and the engine produces a live readout from the mic**
+  Steps: Run the app (▶ Run). Deferred — *no UI yet to display `TunerState`*; logic covered by 26 green
+  JVM tests. Activates when Slice 3 renders the state.
+
+- [⏳] **2. Auto mode targets the correct nearest string; manual mode honors the selected string**
+  Steps: (needs UI) — deferred to Slice 3, where modes are toggleable and the target is visible.
+
+- [x] **3. `./gradlew testDebugUnitTest` is green (26 tests)** — ✅ 2026-08-09 (user's machine, fresh
+  PowerShell w/ JAVA_HOME). Re-confirmed independent of my environment.
+  Steps: Android Studio terminal → `./gradlew testDebugUnitTest`. ✅ if BUILD SUCCESSFUL, 26 tests.
+
+> ✅ **Verdict:** Slice 2 logic HITL satisfied via check #3 (2026-08-09). Checks #1/#2 ⏳ blocked on UI (Slice 3).
 
 ---
 
