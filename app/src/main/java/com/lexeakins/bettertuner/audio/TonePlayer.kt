@@ -1,7 +1,7 @@
 package com.lexeakins.bettertuner.audio
 
+import android.media.AudioAttributes
 import android.media.AudioFormat
-import android.media.AudioRecord
 import android.media.AudioTrack
 import android.media.MediaRecorder
 
@@ -18,9 +18,9 @@ interface TonePlayer {
 }
 
 /**
- * Real implementation backed by Android [AudioTrack]. Generates a sine in memory and streams it; the
- * buffer is computed on the device and never leaves it. All audio failures are swallowed (logged) so a
- * missing/blocked audio output can never crash the tuner UI.
+ * Real implementation backed by Android [AudioTrack]. Generates a sine in memory and streams it in a loop
+ * for as long as [start] is active; the buffer is computed on the device and never leaves it. All audio
+ * failures are swallowed (logged) so a missing/blocked audio output can never crash the tuner UI.
  */
 class AudioTrackTonePlayer : TonePlayer {
     @Volatile private var track: AudioTrack? = null
@@ -28,9 +28,9 @@ class AudioTrackTonePlayer : TonePlayer {
 
     override fun start(frequencyHz: Double) {
         try {
-            stop() // ensure clean retune
+            stop() // clean retune
             val sampleRate = 44100
-            val n = sampleRate // 1s ring buffer
+            val n = sampleRate / 4 // 0.25s buffer, looped for a sustained tone
             val buf = ShortArray(n)
             for (i in 0 until n) {
                 val t = i.toDouble() / sampleRate
@@ -38,9 +38,9 @@ class AudioTrackTonePlayer : TonePlayer {
             }
             val at = AudioTrack.Builder()
                 .setAudioAttributes(
-                    android.media.AudioAttributes.Builder()
-                        .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
-                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                         .build(),
                 )
                 .setAudioFormat(
@@ -54,10 +54,18 @@ class AudioTrackTonePlayer : TonePlayer {
                 .build()
             if (at.state != AudioTrack.STATE_INITIALIZED) return
             at.play()
-            at.write(buf, 0, buf.size)
-            // loop the buffer for a sustained tone while held
             track = at
             playing = true
+            Thread({
+                while (playing && track != null) {
+                    try {
+                        val written = at.write(buf, 0, buf.size)
+                        if (written <= 0) break
+                    } catch (_: Exception) {
+                        break
+                    }
+                }
+            }, "ReferenceTone").start()
         } catch (e: Exception) {
             android.util.Log.w("BetterTuner", "tone play failed (non-fatal): ${e.message}")
         }

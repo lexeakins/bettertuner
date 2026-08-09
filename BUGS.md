@@ -118,3 +118,22 @@ Bug reports follow a tight, reproducible harness. Each entry: symptom, root caus
 - **Regression test:** instrumented capture test confirms the audio subsystem initializes on the phone;
   unit-level coverage pending (AudioTrack is Android-runtime, covered by HITL).
 - **Status:** FIXED (2026-08-09).
+
+## BT-011 — Swipes, string-strip tap, and center-tap tone all dead (gesture wiring)
+- **Reported:** 2026-08-09 (Slice 3 HITL: user noted "none of the swipe actions work" and center long-press
+  tone never played — the long-press clue showed the tone handler was never invoked).
+- **Root cause (3 distinct defects in TunerScreen):**
+  1. Center tone: the `Box.pointerInput` only registered `detectHorizontal/VerticalDragGestures` with
+     EMPTY drag lambdas — there was no tap/long-press handler, so `startReferenceTone()` was never called.
+  2. String strip swipes: it used a `LazyColumn`, which consumes vertical drags for its own scrolling, so
+     our `detectVerticalDragGestures` never fired; and it treated each *incremental* delta (>40px) as a
+     swipe, causing no-op/chaotic cycling instead of one cycle per gesture.
+  3. (Audio config, see BT-010 corollary) bell used `USAGE_ASSISTANCE_SONIFICATION` + `MODE_STATIC` which
+     is routed away/muted on the test device; switched to `USAGE_MEDIA` + `MODE_STREAM` (proven by probe).
+- **Fix:**
+  - Center readout wrapped in a `Box` with `detectTapGestures { onPress -> startReferenceTone(); awaitRelease(); finally stopReferenceTone() }`.
+  - String strip = plain `Column` (no scroll consumption) with accumulated `accX`/`accY` committed once on drag end (>40px) → single cycle in the dominant axis; tap still selects via `clickable`.
+  - Bell + `AudioTrackTonePlayer` now `USAGE_MEDIA`/`MODE_STREAM`; tone player loops a 0.25s buffer while held for a sustained tone.
+- **Regression test:** none automated (gesture+audio are HITL/device); verified by building + instrumented
+  audio-output probe (passes on real phone). Re-test checks #5/#6 pending user HITL.
+- **Status:** FIXED (2026-08-09) — pending HITL re-verify.

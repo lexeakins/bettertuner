@@ -163,11 +163,11 @@ To test on your phone:
   Steps: Use the top tuning selector. ✅ if the left EADGBE strip updates (Drop D shows D low; DADGAD shows
   its 6 targets) and auto mode targets within the chosen tuning.
 
-- [x] **5. Swipe up/down + left/right cycles strings; tap a letter jumps**  · *emulator or phone*  · ✅ 2026-08-09
+- [x] **5. Swipe up/down + left/right cycles strings; tap a letter jumps**  · *emulator or phone*  · ⏳ RE-VERIFY (BT-011: swipes were unwired; re-test after fix)
   Steps: On the left strip, swipe up/down and left/right; tap a letter (e.g. "G"). ✅ if the selected
   target changes accordingly in all three ways; manual pick flips the mode toggle to Manual.
 
-- [ ] **6. Center-tap plays target tone; release stops**  · *phone only (needs audio out + in)*  · ⏳ re-test
+- [ ] **6. Center-tap plays target tone; release stops**  · *phone only (needs audio out + in)*  · ⏳ re-test (BT-011: tone handler was never wired; now fixed)
   Steps: On phone, press-and-hold the screen center while tuning a string. ✅ if you hear the target
   note's tone while held and it stops on release. (Distinct from the lock-in bell.)
 

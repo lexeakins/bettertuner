@@ -10,6 +10,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,8 +22,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -37,6 +36,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -45,7 +45,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -57,7 +56,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lexeakins.bettertuner.tuner.TuneDirection
 import com.lexeakins.bettertuner.tuner.Tuning
 import kotlin.math.abs
-import kotlin.math.min
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -106,7 +104,7 @@ fun TunerScreen(viewModel: TunerViewModel) {
                 title = { Text("BetterTuner") },
                 actions = {
                     TuningSelector(ui.tuning) { viewModel.setTuning(it) }
-                    TextButton(onClick = { showSettings = true }) { Text("⚙") }
+                    TextButton(onClick = { showSettings = true }) { Text("\u2699") }
                 },
             )
         },
@@ -114,16 +112,7 @@ fun TunerScreen(viewModel: TunerViewModel) {
         Box(
             Modifier
                 .fillMaxSize()
-                .padding(padding)
-                // Center tap plays the target reference tone while held.
-                .pointerInput(Unit) {
-                    detectHorizontalDragGestures(
-                        onDragEnd = { viewModel.stopReferenceTone() },
-                    ) { _, _ -> }
-                    detectVerticalDragGestures(
-                        onDragEnd = { viewModel.stopReferenceTone() },
-                    ) { _, _ -> }
-                },
+                .padding(padding),
         ) {
             // LEFT EDGE: EADGBE strip (tappable + swipeable), for left-hand thumb.
             StringStrip(
@@ -137,7 +126,8 @@ fun TunerScreen(viewModel: TunerViewModel) {
                     .width(72.dp),
             )
 
-            // CENTER: big note, needle, frequency compare.
+            // CENTER: big note + needle + freq compare, wrapped in a tap-hold zone that plays the
+            // target reference tone while held (released -> stops).
             Column(
                 Modifier
                     .fillMaxSize()
@@ -146,36 +136,58 @@ fun TunerScreen(viewModel: TunerViewModel) {
                 verticalArrangement = Arrangement.Center,
             ) {
                 val t = ui.tuner
-                Text(
-                    t.detected?.label ?: "—",
-                    fontSize = 120.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (t.inTune) Color(0xFF2E7D32) else MaterialTheme.colorScheme.onBackground,
-                )
-                val cents = t.cents.toFloat()
-                val needleX = (cents / 50f).coerceIn(-1f, 1f) // ±50¢ full sweep
-                NeedleGauge(deflection = needleX, inTune = t.inTune)
-                Text(
-                    t.directionLabel,
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = when (t.direction) {
-                        TuneDirection.LOW -> Color(0xFF1565C0)
-                        TuneDirection.HIGH -> Color(0xFFC62828)
-                        TuneDirection.IN_TUNE -> Color(0xFF2E7D32)
-                    },
-                )
-                Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onPress = {
+                                    try {
+                                        viewModel.startReferenceTone()
+                                        awaitRelease()
+                                    } finally {
+                                        viewModel.stopReferenceTone()
+                                    }
+                                },
+                            )
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("DETECTED", fontSize = 12.sp)
-                        Text("%.1f Hz".format(t.detected?.frequencyHz ?: 0.0), fontSize = 18.sp)
-                    }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("TARGET", fontSize = 12.sp)
-                        Text("%.1f Hz".format(t.target?.frequencyHz ?: 0.0), fontSize = 18.sp)
+                        Text(
+                            t.detected?.label ?: "—",
+                            fontSize = 120.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (t.inTune) Color(0xFF2E7D32) else MaterialTheme.colorScheme.onBackground,
+                        )
+                        val cents = t.cents.toFloat()
+                        val needleX = (cents / 50f).coerceIn(-1f, 1f) // ±50¢ full sweep
+                        NeedleGauge(deflection = needleX, inTune = t.inTune)
+                        Text(
+                            t.directionLabel,
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = when (t.direction) {
+                                TuneDirection.LOW -> Color(0xFF1565C0)
+                                TuneDirection.HIGH -> Color(0xFFC62828)
+                                TuneDirection.IN_TUNE -> Color(0xFF2E7D32)
+                            },
+                        )
+                        Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("DETECTED", fontSize = 12.sp)
+                                Text("%.1f Hz".format(t.detected?.frequencyHz ?: 0.0), fontSize = 18.sp)
+                            }
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("TARGET", fontSize = 12.sp)
+                                Text("%.1f Hz".format(t.target?.frequencyHz ?: 0.0), fontSize = 18.sp)
+                            }
+                        }
                     }
                 }
-                Row(Modifier.padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+
+                Row(Modifier.padding(bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("Auto", fontSize = 16.sp)
                     Switch(checked = ui.autoMode, onCheckedChange = { viewModel.setAutoMode(it) })
                 }
@@ -218,20 +230,32 @@ private fun StringStrip(
     onCycle: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    LazyColumn(
+    // Plain Column (NOT LazyColumn) so it doesn't consume drags for scrolling. Swipe accumulates offset
+    // and commits a single cycle on drag end in the dominant axis.
+    var accX by remember { mutableFloatStateOf(0f) }
+    var accY by remember { mutableFloatStateOf(0f) }
+    Column(
         modifier
             .pointerInput(Unit) {
-                detectVerticalDragGestures { _, drag ->
-                    if (abs(drag) > 40) onCycle(if (drag < 0) 1 else -1)
-                }
-                detectHorizontalDragGestures { _, drag ->
-                    if (abs(drag) > 40) onCycle(if (drag < 0) 1 else -1)
-                }
+                detectHorizontalDragGestures(
+                    onDragStart = { accX = 0f },
+                    onDragEnd = {
+                        if (abs(accX) > 40f) onCycle(if (accX < 0f) 1 else -1)
+                        accX = 0f
+                    },
+                ) { _, drag -> accX += drag }
+                detectVerticalDragGestures(
+                    onDragStart = { accY = 0f },
+                    onDragEnd = {
+                        if (abs(accY) > 40f) onCycle(if (accY < 0f) 1 else -1)
+                        accY = 0f
+                    },
+                ) { _, drag -> accY += drag }
             },
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        itemsIndexed(tuning.targets) { i, target ->
+        tuning.targets.forEachIndexed { i, target ->
             val selected = i == selectedIndex
             Surface(
                 color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
@@ -257,7 +281,6 @@ private fun StringStrip(
 
 @Composable
 private fun TuningSelector(current: Tuning, onPick: (Tuning) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
     // Simplified: a row of three buttons (Standard / Drop D / DADGAD).
     Row {
         for (t in listOf(Tuning.STANDARD, Tuning.DROP_D, Tuning.DADGAD)) {
@@ -298,9 +321,11 @@ private fun SettingsScreen(onBack: () -> Unit, onTheme: () -> Unit) {
     }
 }
 
-/** Play a short, satisfying reward "ding" — fully synthesized on-device, no assets, no network. */
+/**
+ * Play a short, satisfying reward "ding" — fully synthesized on-device, no assets, no network.
+ * Uses USAGE_MEDIA + MODE_STREAM (verified to play on the test device); never crashes the UI.
+ */
 private fun playRewardBell(context: android.content.Context) {
-    // Run off the main thread; never let an audio-config failure crash the UI.
     Thread({
         try {
             val sampleRate = 44100
@@ -316,8 +341,8 @@ private fun playRewardBell(context: android.content.Context) {
             val track = android.media.AudioTrack.Builder()
                 .setAudioAttributes(
                     android.media.AudioAttributes.Builder()
-                        .setUsage(android.media.AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
-                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
                         .build(),
                 )
                 .setAudioFormat(
@@ -327,14 +352,20 @@ private fun playRewardBell(context: android.content.Context) {
                         .setChannelMask(android.media.AudioFormat.CHANNEL_OUT_MONO)
                         .build(),
                 )
-                .setTransferMode(android.media.AudioTrack.MODE_STATIC)
+                .setTransferMode(android.media.AudioTrack.MODE_STREAM)
                 .build()
+            android.util.Log.d("BetterTuner", "reward bell: state=${track.state}")
             if (track.state == android.media.AudioTrack.STATE_INITIALIZED) {
-                track.write(buf, 0, buf.size)
+                var off = 0
+                while (off < buf.size) {
+                    val written = track.write(buf, off, buf.size - off)
+                    if (written <= 0) break
+                    off += written
+                }
                 track.play()
+                Thread.sleep((durationMs + 50).toLong())
+                track.stop()
             }
-            // MODE_STATIC keeps the buffer; release after it has had time to play.
-            Thread.sleep((durationMs + 50).toLong())
             track.release()
         } catch (e: Exception) {
             android.util.Log.w("BetterTuner", "reward bell failed (non-fatal): ${e.message}")
