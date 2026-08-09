@@ -1,0 +1,14 @@
+*.iml
+.gradle
+/local.properties
+/.idea
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+# Bundled Gradle distribution (use wrapper only)
+gradle/wrapper/gradle-8.9/
+gradle/wrapper/gradle-8.9-bin.zip
