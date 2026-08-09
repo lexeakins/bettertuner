@@ -19,3 +19,21 @@ Bug reports follow a tight, reproducible harness. Each entry: symptom, root caus
 - **Root cause:** `kotlin.math.absoluteValue` not imported.
 - **Regression test:** `NoteConverterTest.isInTune_threshold` (plus compile of `Pitch`).
 - **Status:** FIXED (2026-08-09).
+
+## BT-003 — Wrong `AudioSource` contract assertions in test
+- **Reported:** 2026-08-09 (slice #1 audio capture, test run)
+- **Symptom:** `AudioSourceContractTest.fake_emits_buffer_of_expected_size_and_rate` and `fake_does_not_loop` failed.
+- **Root cause:** Test mis-stated the Fake's contract — `start()` does NOT auto-call `stop()` (correct),
+  and the "does not loop" assertion logic was inverted. The `FakeAudioSource` was behaving correctly; the
+  tests were wrong, not the code.
+- **Regression test:** Corrected `AudioSourceContractTest` (asserts `started`, single emit `calls==1`,
+  no auto-stop). Pinned the real contract for the seam.
+- **Status:** FIXED (2026-08-09).
+
+## BT-004 — `androidx.test:rules` version line
+- **Reported:** 2026-08-09 (instrumented test compile)
+- **Symptom:** `Could not find androidx.test:rules:1.2.1` — `GrantPermissionRule` unresolved.
+- **Root cause:** `rules` is a distinct artifact versioned with the test runner line (1.6.x), not the
+  `androidx.test.ext:junit` line (1.2.1). Needed a separate `testRules` version in the catalog.
+- **Regression test:** `AudioRecordSourceTest` compiles (GrantPermissionRule resolves).
+- **Status:** FIXED (2026-08-09).
