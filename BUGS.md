@@ -318,3 +318,17 @@ Bug reports follow a tight, reproducible harness. Each entry: symptom, root caus
   gated on `value.isNotBlank()`, so empty fields never show error state.
 - **Regression test:** `parse_blankNote_isIncomplete_notError` (asserts ok=false AND error=null for a blank field).
 - **Status:** FIXED (2026-08-09) — pending HITL re-verify.
+
+## BT-026 — Custom dialog warnings must evaluate per-field, not wait for all 6 filled
+- **Reported:** 2026-08-09 (follow-up to BT-025) — entering a note in one field (e.g. E4 in the low-E slot) showed
+  no warning while the other 5 were still blank, because `parse()` short-circuited to "incomplete" and returned no
+  warnings at all. User: evaluate one field at a time, not the total.
+- **Fix:** `TuningParser.parse` now computes a per-field `warnings` list for every field independently: blank ->
+  NONE (keeps `ok=false` so Apply stays disabled, but no longer suppresses other fields' warnings); valid ->
+  its own WarningLevel vs that string's Standard reference; malformed non-blank -> NONE for that field + sets `error`.
+  `ok` is true only when all 6 are valid; `error` only on a malformed non-blank note.
+- **Note (verified):** E4 in the low-E slot is +24 semitones above E2 -> correctly HARD (red), not SOFT. The
+  user's image showed exactly that; per-field eval now flags it immediately. Use F#2 for a +2 SOFT demo.
+- **Regression test:** `parse_warns_perField_even_with_blanks` (F#2 in low slot with others blank -> SOFT on
+  field 0, ok=false, error=null).
+- **Status:** FIXED (2026-08-09) — pending HITL re-verify.

@@ -42,6 +42,17 @@ class TuningParserTest {
     }
 
     @Test
+    fun parse_warns_perField_even_with_blanks() {
+        // Only the low-E field is filled (F#2 = +2 above E2). Others blank. Warning must still show on field 0,
+        // and Apply must stay disabled (ok=false) without a red error.
+        val r = TuningParser.parse(listOf("F#2", "", "", "", "", ""))
+        assertFalse(r.ok) // not all 6 entered -> Apply disabled
+        assertNull(r.error) // no red error for blanks
+        assertEquals(TuningParser.WarningLevel.SOFT, r.warnings[0]) // F#2 in low slot -> +2 -> SOFT
+        assertEquals(TuningParser.WarningLevel.NONE, r.warnings[1]) // blank -> NONE
+    }
+
+    @Test
     fun parse_blankNote_isIncomplete_notError() {
         // Blank fields mean "not entered yet": parse fails (ok=false) but must NOT set a red error message.
         val r = TuningParser.parse(listOf("E2", "A2", "", "G3", "B3", "E4"))

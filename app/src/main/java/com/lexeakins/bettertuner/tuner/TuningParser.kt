@@ -41,26 +41,44 @@ object TuningParser {
      * "A#3", "Bb4"). Blank or malformed entries, or a wrong count, fail with [ParseResult.error].
      * On success, [warnings] holds the safety level for each string vs its Standard reference.
      */
+    /**
+     * Parses [fields] (low string -> high string). Evaluates each field INDEPENDENTLY:
+     * - A blank field is "not entered yet" -> contributes WarningLevel.NONE, keeps [ok] false (Apply disabled)
+     *   but does NOT suppress warnings on the fields the user HAS filled.
+     * - A non-blank but malformed note (e.g. "X3") sets [error] and that field's warning to NONE.
+     * - A valid note contributes its own safety [WarningLevel] vs that string's Standard reference.
+     * So typing "E4" (or E4 in the low slot) flags a warning immediately, even with the other 5 still empty.
+     */
     fun parse(fields: List<String>, a4Hz: Double = 440.0): ParseResult {
         if (fields.size != 6) {
-            return ParseResult(null, "Enter exactly 6 notes (low E to high e).", emptyList())
+            return ParseResult(null, "Enter exactly 6 notes (low E to high e).", List(6) { WarningLevel.NONE })
         }
-        // Blank fields mean "not entered yet" — incomplete, not an error. Caller disables Apply but shows no red text.
-        if (fields.any { it.isBlank() }) {
-            return ParseResult(null, null, emptyList())
-        }
-        val pitches = mutableListOf<Pitch>()
+        val pitches = mutableListOf<Pitch?>()
+        var malformed: String? = null
         for (raw in fields) {
-            val p = NoteConverter.parseNote(raw, a4Hz)
-            if (p == null) {
-                return ParseResult(null, "Invalid note: \"${raw.trim()}\". Use e.g. E2, A#3, Bb4.", emptyList())
+            val trimmed = raw.trim()
+            if (trimmed.isBlank()) {
+                pitches.add(null) // not entered yet
+                continue
             }
-            pitches.add(p)
+            val p = NoteConverter.parseNote(trimmed, a4Hz)
+            if (p == null) {
+                malformed = trimmed
+                pitches.add(null)
+            } else {
+                pitches.add(p)
+            }
         }
         val warnings = pitches.mapIndexed { i, p ->
-            warningFor(STANDARD_REFERENCE[i], p)
+            if (p == null) WarningLevel.NONE else warningFor(STANDARD_REFERENCE[i], p)
         }
-        return ParseResult(pitches, null, warnings)
+        // ok only when every field is a valid note; error only when a non-blank entry is malformed.
+        val allValid = pitches.all { it != null }
+        return ParseResult(
+            pitches = if (allValid) pitches.filterNotNull() else null,
+            error = malformed?.let { "Invalid note: \"$it\". Use e.g. E2, A#3, Bb4." },
+            warnings = warnings,
+        )
     }
 
     /** Semitone distance of [custom] above [standard]; negative means tuned down (safe). */
