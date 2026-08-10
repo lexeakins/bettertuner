@@ -28,7 +28,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuItem
 import com.lexeakins.bettertuner.settings.Settings
@@ -93,6 +95,7 @@ fun TunerScreen(viewModel: TunerViewModel) {
     var showRationale by remember { mutableStateOf(!hasPermission) }
     var showSettings by remember { mutableStateOf(false) }
     var showCustom by remember { mutableStateOf(false) }
+    var pendingDelete by remember { mutableStateOf<Pair<String, String>?>(null) }
 
     val launcher = rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { granted ->
         hasPermission = granted
@@ -136,6 +139,24 @@ fun TunerScreen(viewModel: TunerViewModel) {
         return
     }
 
+    // Confirm-delete for a saved tuning (triggered by the trash icon in the dropdown).
+    if (pendingDelete != null) {
+        val (did, dname) = pendingDelete!!
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            title = { Text("Delete \"$dname\"?") },
+            text = { Text("This saved tuning will be removed permanently.") },
+            confirmButton = {
+                TextButton(onClick = { viewModel.deleteTuning(did); pendingDelete = null }) {
+                    Text("Delete", color = Color(0xFFC62828))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDelete = null }) { Text("Cancel") }
+            },
+        )
+        return
+    }
 
 
     if (showRationale && !hasPermission) {
@@ -176,6 +197,7 @@ fun TunerScreen(viewModel: TunerViewModel) {
                             viewModel.applySavedTuning(id)
                             showCustom = true
                         },
+                        onConfirmDeleteSaved = { id, name -> pendingDelete = id to name },
                         onDeleteSaved = { viewModel.deleteTuning(it) },
                         onOpenCustom = { showCustom = true },
                     )
@@ -387,6 +409,7 @@ private fun TuningSelector(
     onPickBuiltin: (Tuning) -> Unit,
     onPickSaved: (String) -> Unit,
     onRenameSaved: (String) -> Unit,
+    onConfirmDeleteSaved: (String, String) -> Unit,
     onDeleteSaved: (String) -> Unit,
     onOpenCustom: () -> Unit,
 ) {
@@ -408,32 +431,23 @@ private fun TuningSelector(
                 Text("Your saved tunings", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
                 for (c in customTunings) {
-                    val dismissState = rememberSwipeToDismissBoxState()
-                    LaunchedEffect(dismissState.currentValue) {
-                        if (dismissState.currentValue == SwipeToDismissBoxValue.EndToStart) {
-                            onDeleteSaved(c.id)
-                        }
-                    }
-                    SwipeToDismissBox(
-                        state = dismissState,
-                        enableDismissFromStartToEnd = false,
-                        enableDismissFromEndToStart = true,
-                        backgroundContent = {
-                            Box(
-                                Modifier.fillMaxSize().background(Color(0xFFC62828)).padding(end = 24.dp),
-                                contentAlignment = Alignment.CenterEnd,
-                            ) { Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = Color.White) }
+                    // Explicit buttons (no fragile swipe/long-press inside a popup): tap = apply,
+                    // pencil = rename, trash = confirm delete.
+                    DropdownMenuItem(
+                        text = { Text(c.name) },
+                        onClick = { onPickSaved(c.id); expanded = false },
+                        trailingIcon = {
+                            Row {
+                                IconButton(onClick = { onRenameSaved(c.id); expanded = false }) {
+                                    Icon(Icons.Filled.Edit, contentDescription = "Rename ${c.name}")
+                                }
+                                IconButton(onClick = { onConfirmDeleteSaved(c.id, c.name); expanded = false }) {
+                                    Icon(Icons.Filled.Delete, contentDescription = "Delete ${c.name}",
+                                        tint = Color(0xFFC62828))
+                                }
+                            }
                         },
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text(c.name) },
-                            onClick = { onPickSaved(c.id); expanded = false },
-                            modifier = Modifier.combinedClickable(
-                                onClick = { onPickSaved(c.id); expanded = false },
-                                onLongClick = { onRenameSaved(c.id); expanded = false },
-                            ),
-                        )
-                    }
+                    )
                 }
             }
             HorizontalDivider()

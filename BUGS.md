@@ -369,3 +369,20 @@ Bug reports follow a tight, reproducible harness. Each entry: symptom, root caus
     pre-loaded). Single tap still applies the tuning. Removed the dead pendingSavedId AlertDialog.
 - **Regression:** interface unchanged; JVM suite green. HITL-2026-08-10b covers tap-sound + swipe-delete + long-press-rename.
 - **Status:** FIXED (2026-08-10) — pending HITL re-verify.
+
+## BT-029 — Saved-tuning management unreliable + stale build never installed
+- **Reported:** 2026-08-10 — swipe-left-to-delete was "always ready to delete", long-press rename did nothing,
+  trash icon didn't delete. Screenshot showed the OLD trailing-icon layout, revealing the installed APK was stale.
+- **Root causes:**
+  - Swipe + long-press gestures do not work reliably INSIDE a Material3 `ExposedDropdownMenu` popup (the menu
+    consumes drags / dismisses on interaction). The earlier fixes never actually reached the device either.
+  - Install process: `adb install -r` reported "Success" but a stale build was apparently served; the device kept
+    the old versionCode=1 binary. Confirmed by `dumpsys package` showing versionCode=1 despite rebuilds.
+- **Fixes:**
+  - Replaced swipe/long-press with **explicit buttons**: each saved row now has a pencil (rename → opens Custom
+    dialog pre-loaded) and a red trash (delete → opens a confirm AlertDialog before removing). Tap still applies.
+  - Build/install process fixed: bumped `versionCode` to 2 and now **uninstall + fresh install** each push, then
+    VERIFY via `adb shell dumpsys package ... | grep versionCode`. This caught the stale-build problem.
+  - Removed dead SwipeToDismissBox / combinedClickable / pendingSavedId code and unused imports.
+- **Verification (done this turn):** device now reports versionCode=2 after uninstall+install; JVM suite green.
+- **Status:** FIXED (2026-08-10) — pending HITL re-verify on the FRESH build.
