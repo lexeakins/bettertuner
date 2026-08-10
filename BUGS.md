@@ -332,3 +332,22 @@ Bug reports follow a tight, reproducible harness. Each entry: symptom, root caus
 - **Regression test:** `parse_warns_perField_even_with_blanks` (F#2 in low slot with others blank -> SOFT on
   field 0, ok=false, error=null).
 - **Status:** FIXED (2026-08-09) — pending HITL re-verify.
+
+## BT-027 — Polish: dropdown icon crowding, strip tap-to-select, replace hold-tone with a 3s guitar pluck
+- **Reported:** 2026-08-10 (HITL passing) — three polish items:
+  1. Saved-tuning rows in the dropdown had always-visible edit/delete icons that ran into the label text.
+  2. Tapping a letter in the strip only played a sound; it should ALSO switch to manual mode and change string focus.
+  3. Long-press tone was quiet and "built up" inconsistently; replace with a resonant ~3s complete note that
+     emulates a plucked guitar string.
+- **Fixes:**
+  1. Removed the always-visible icon row. Saved rows now respond to **long-press** (via combinedClickable) which
+     opens a confirm `AlertDialog` with Rename / Delete (label stays fully legible). Single tap still applies.
+  2. Strip note is now `.clickable { onSelect(i); onPreviewTone(...) }` — tap selects that string (manual mode,
+     focus changes via `selectString`) AND previews its target tone. Removed the hold-to-sustain gesture entirely.
+  3. `TonePlayer` rewritten as a deterministic 3s pluck: a fixed 44.1kHz PCM buffer (MODE_STATIC) = fundamental +
+     6 harmonics with 1/n^2 amplitudes under a ~4ms attack + exponential decay, normalized to ~90% FS. Plays once,
+     self-terminating; `stop()` cuts early. No streaming/ramp "build-up". The lock-in bell (`playRewardBell`) is
+     unchanged (its own 180ms ding).
+- **Regression:** interface unchanged (still `start`/`stop`); existing fake implementations in tests unaffected.
+  Manual HITL checklist (HITL-2026-08-10) covers the three behaviors.
+- **Status:** FIXED (2026-08-10) — pending HITL re-verify.

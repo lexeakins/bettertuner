@@ -264,16 +264,9 @@ class TunerViewModel(
 
     fun stopReferenceTone() = tonePlayer.stop()
 
-    /** Preview/sustain a specific pitch's tone from the left-menu note (tap = short, hold = sustained). */
-    fun startToneForPitch(frequencyHz: Double) = tonePlayer.start(frequencyHz)
-
-    /** Tap preview: play the pitch briefly (~350ms) then stop, so a tap doesn't leave a dangling tone. */
+    /** Preview the target tone for a pitch: a ~3s plucked-string sound (self-terminating). */
     fun previewTone(frequencyHz: Double) {
         tonePlayer.start(frequencyHz)
-        viewModelScope.launch {
-            kotlinx.coroutines.delay(350)
-            tonePlayer.stop()
-        }
     }
 
     fun consumeRewardBell(): Boolean {

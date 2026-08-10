@@ -4,6 +4,8 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -25,8 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuItem
@@ -89,6 +90,7 @@ fun TunerScreen(viewModel: TunerViewModel) {
     var showRationale by remember { mutableStateOf(!hasPermission) }
     var showSettings by remember { mutableStateOf(false) }
     var showCustom by remember { mutableStateOf(false) }
+    var pendingSavedId by remember { mutableStateOf<String?>(null) }
 
     val launcher = rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { granted ->
         hasPermission = granted
@@ -132,6 +134,35 @@ fun TunerScreen(viewModel: TunerViewModel) {
         return
     }
 
+    // Long-press on a saved tuning in the dropdown -> confirm Rename / Delete (keeps the label legible).
+    if (pendingSavedId != null) {
+        val sid = pendingSavedId!!
+        val sname = ui.customTunings.firstOrNull { it.id == sid }?.name ?: ""
+        AlertDialog(
+            onDismissRequest = { pendingSavedId = null },
+            title = { Text("Saved tuning: $sname") },
+            text = { Text("Rename opens the editor with this tuning loaded. Delete removes it permanently.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.applySavedTuning(sid)
+                    showCustom = true
+                    pendingSavedId = null
+                }) { Text("Rename") }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = { pendingSavedId = null }) { Text("Cancel") }
+                    TextButton(onClick = {
+                        viewModel.deleteTuning(sid)
+                        pendingSavedId = null
+                    }) { Text("Delete", color = Color(0xFFC62828)) }
+                }
+            },
+        )
+        return
+    }
+
+
 
     if (showRationale && !hasPermission) {
         RationaleScreen(
@@ -166,6 +197,7 @@ fun TunerScreen(viewModel: TunerViewModel) {
                         customTunings = ui.customTunings,
                         onPickBuiltin = { viewModel.setTuning(it) },
                         onPickSaved = { viewModel.applySavedTuning(it) },
+                        onLongPressSaved = { pendingSavedId = it },
                         onDeleteSaved = { viewModel.deleteTuning(it) },
                         onRenameSaved = { id ->
                             // Open the custom dialog pre-loaded with that saved tuning, ready to rename.
@@ -210,8 +242,6 @@ fun TunerScreen(viewModel: TunerViewModel) {
                     lockProgress = ui.lockProgress,
                     onSelect = { viewModel.selectString(it) },
                     onPreviewTone = { viewModel.previewTone(it) },
-                    onHoldTone = { viewModel.startToneForPitch(it) },
-                    onReleaseTone = { viewModel.stopReferenceTone() },
                     modifier = Modifier
                         .align(Alignment.CenterStart)
                         .fillMaxHeight(0.8f)
@@ -316,12 +346,10 @@ private fun StringStrip(
     lockProgress: Float = 0f,
     onSelect: (Int) -> Unit,
     onPreviewTone: (Double) -> Unit,
-    onHoldTone: (Double) -> Unit,
-    onReleaseTone: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     // Plain Column (NOT LazyColumn) so it doesn't consume drags for scrolling. Swipe-to-cycle lives on the
-    // outer Box (TunerScreen) so it never conflicts with the per-note tap/hold gestures here.
+    // outer Box (TunerScreen) so it never conflicts with the per-note tap gesture here.
     Column(
         modifier,
         verticalArrangement = Arrangement.Center,
@@ -337,19 +365,7 @@ private fun StringStrip(
                     // Grey the note out once it's been detected in-tune (whole-instrument progress).
                     .alpha(if (tuned) 0.35f else 1f)
                     .clip(RoundedCornerShape(8.dp))
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onTap = { onPreviewTone(target.frequencyHz) },
-                            onPress = {
-                                try {
-                                    onHoldTone(target.frequencyHz)
-                                    awaitRelease()
-                                } finally {
-                                    onReleaseTone()
-                                }
-                            },
-                        )
-                    },
+                    .clickable { onSelect(i); onPreviewTone(target.frequencyHz) },
                 contentAlignment = Alignment.Center,
             ) {
                 Surface(
@@ -393,13 +409,14 @@ private fun StringStrip(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 private fun TuningSelector(
     current: Tuning,
     customTunings: List<SavedTuning>,
     onPickBuiltin: (Tuning) -> Unit,
     onPickSaved: (String) -> Unit,
+    onLongPressSaved: (String) -> Unit,
     onDeleteSaved: (String) -> Unit,
     onRenameSaved: (String) -> Unit,
     onOpenCustom: () -> Unit,
@@ -425,16 +442,11 @@ private fun TuningSelector(
                     DropdownMenuItem(
                         text = { Text(c.name) },
                         onClick = { onPickSaved(c.id); expanded = false },
-                        trailingIcon = {
-                            Row {
-                                IconButton(onClick = { onRenameSaved(c.id); expanded = false }) {
-                                    Icon(Icons.Filled.Edit, contentDescription = "Rename ${c.name}")
-                                }
-                                IconButton(onClick = { onDeleteSaved(c.id); expanded = false }) {
-                                    Icon(Icons.Filled.Delete, contentDescription = "Delete ${c.name}")
-                                }
-                            }
-                        },
+                        // Long-press reveals Rename/Delete so the label stays legible (no cramped icon row).
+                        modifier = Modifier.combinedClickable(
+                            onClick = { onPickSaved(c.id); expanded = false },
+                            onLongClick = { onLongPressSaved(c.id); expanded = false },
+                        ),
                     )
                 }
             }
