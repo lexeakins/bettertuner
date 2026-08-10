@@ -351,3 +351,21 @@ Bug reports follow a tight, reproducible harness. Each entry: symptom, root caus
 - **Regression:** interface unchanged (still `start`/`stop`); existing fake implementations in tests unaffected.
   Manual HITL checklist (HITL-2026-08-10) covers the three behaviors.
 - **Status:** FIXED (2026-08-10) — pending HITL re-verify.
+
+## BT-028 — No audible tone on tap; long-press did nothing; dropdown interaction rework
+- **Reported:** 2026-08-10 — (a) tapping a strip note produced no audible sound; (b) long-pressing a saved
+  tuning in the dropdown did nothing.
+- **Root causes:**
+  - (a) The MODE_STATIC AudioTrack from BT-027 failed to initialize on the user's device (state != INITIALIZED),
+    so play() never ran and nothing was audible. The earlier streaming (MODE_STREAM) path worked fine.
+  - (b) The long-press handler was wired to a `pendingSavedId` AlertDialog, but the SwipeToDismiss/combinedClickable
+    wiring was inconsistent and never surfaced; user also wanted a different interaction model.
+- **Fixes:**
+  - (a) `TonePlayer` reverted to the proven MODE_STREAM path, keeping the new plucked-string envelope (fundamental
+    + 6 harmonics 1/n^2, 4ms attack + exp decay, normalized). The full 3s buffer streams once and the track stops
+    on completion. Deterministic, audible, no build-up.
+  - (b) Saved-tuning rows reworked per user's preferred model: **swipe left (end-to-start) reveals a red delete
+    background** (SwipeToDismissBox) that deletes on dismiss; **long-press = rename** (opens the Custom dialog
+    pre-loaded). Single tap still applies the tuning. Removed the dead pendingSavedId AlertDialog.
+- **Regression:** interface unchanged; JVM suite green. HITL-2026-08-10b covers tap-sound + swipe-delete + long-press-rename.
+- **Status:** FIXED (2026-08-10) — pending HITL re-verify.

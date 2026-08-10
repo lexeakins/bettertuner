@@ -22,12 +22,13 @@ interface TonePlayer {
 /**
  * Real implementation backed by Android [AudioTrack]. Synthesizes a fixed 3s PCM buffer that approximates
  * a plucked guitar string: a fundamental plus several decaying harmonics (1/n^2 amplitudes) under a fast
- * attack + exponential decay envelope. The whole buffer is rendered once and played via MODE_STATIC, so the
- * output is deterministic (no streaming "build-up", no clicks). All audio failures are swallowed (logged) so a
+ * attack + exponential decay envelope. The whole buffer is streamed once (MODE_STREAM) and then the track
+ * stops — deterministic, no looping "build-up", no clicks. All audio failures are swallowed (logged) so a
  * missing/blocked output can never crash the tuner UI.
  */
 class AudioTrackTonePlayer : TonePlayer {
     @Volatile private var track: AudioTrack? = null
+    @Volatile private var playing = false
 
     override fun start(frequencyHz: Double) {
         try {
@@ -46,9 +47,9 @@ class AudioTrackTonePlayer : TonePlayer {
             val attackSamples = (sampleRate * 0.004).toInt()
             val decayRate = 1.9 // exp(-decayRate * t): audible tail that fades by ~3s
 
-            var maxAbs = 1.0
             // First pass: compute raw samples and track peak for normalization.
             val raw = DoubleArray(n)
+            var maxAbs = 1.0
             for (i in 0 until n) {
                 val t = i.toDouble() / sampleRate
                 val attack = if (i < attackSamples) (i.toDouble() / attackSamples) else 1.0
@@ -83,19 +84,38 @@ class AudioTrackTonePlayer : TonePlayer {
                         .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
                         .build(),
                 )
-                .setTransferMode(AudioTrack.MODE_STATIC)
-                .setBufferSizeInBytes(buf.size * 2)
+                .setTransferMode(AudioTrack.MODE_STREAM)
                 .build()
             if (at.state != AudioTrack.STATE_INITIALIZED) return
-            at.write(buf, 0, buf.size)
             at.play()
             track = at
+            playing = true
+            Thread({
+                var off = 0
+                while (playing && track != null && off < buf.size) {
+                    try {
+                        val written = at.write(buf, off, buf.size - off)
+                        if (written <= 0) break
+                        off += written
+                    } catch (_: Exception) {
+                        break
+                    }
+                }
+                // Tail finished (or stopped): release.
+                try {
+                    at.stop()
+                    at.release()
+                } catch (_: Exception) {
+                }
+                if (track === at) track = null
+            }, "ReferenceTone").start()
         } catch (e: Exception) {
             android.util.Log.w("BetterTuner", "tone play failed (non-fatal): ${e.message}")
         }
     }
 
     override fun stop() {
+        playing = false
         try {
             track?.stop()
             track?.release()

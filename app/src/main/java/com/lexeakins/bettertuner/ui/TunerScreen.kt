@@ -27,7 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuItem
@@ -36,6 +36,9 @@ import com.lexeakins.bettertuner.settings.SavedTuning
 import com.lexeakins.bettertuner.settings.ThemeMode
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -90,7 +93,6 @@ fun TunerScreen(viewModel: TunerViewModel) {
     var showRationale by remember { mutableStateOf(!hasPermission) }
     var showSettings by remember { mutableStateOf(false) }
     var showCustom by remember { mutableStateOf(false) }
-    var pendingSavedId by remember { mutableStateOf<String?>(null) }
 
     val launcher = rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { granted ->
         hasPermission = granted
@@ -134,34 +136,6 @@ fun TunerScreen(viewModel: TunerViewModel) {
         return
     }
 
-    // Long-press on a saved tuning in the dropdown -> confirm Rename / Delete (keeps the label legible).
-    if (pendingSavedId != null) {
-        val sid = pendingSavedId!!
-        val sname = ui.customTunings.firstOrNull { it.id == sid }?.name ?: ""
-        AlertDialog(
-            onDismissRequest = { pendingSavedId = null },
-            title = { Text("Saved tuning: $sname") },
-            text = { Text("Rename opens the editor with this tuning loaded. Delete removes it permanently.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.applySavedTuning(sid)
-                    showCustom = true
-                    pendingSavedId = null
-                }) { Text("Rename") }
-            },
-            dismissButton = {
-                Row {
-                    TextButton(onClick = { pendingSavedId = null }) { Text("Cancel") }
-                    TextButton(onClick = {
-                        viewModel.deleteTuning(sid)
-                        pendingSavedId = null
-                    }) { Text("Delete", color = Color(0xFFC62828)) }
-                }
-            },
-        )
-        return
-    }
-
 
 
     if (showRationale && !hasPermission) {
@@ -197,16 +171,12 @@ fun TunerScreen(viewModel: TunerViewModel) {
                         customTunings = ui.customTunings,
                         onPickBuiltin = { viewModel.setTuning(it) },
                         onPickSaved = { viewModel.applySavedTuning(it) },
-                        onLongPressSaved = { pendingSavedId = it },
-                        onDeleteSaved = { viewModel.deleteTuning(it) },
                         onRenameSaved = { id ->
                             // Open the custom dialog pre-loaded with that saved tuning, ready to rename.
-                            val saved = ui.customTunings.firstOrNull { it.id == id }
-                            if (saved != null) {
-                                viewModel.applySavedTuning(id)
-                                showCustom = true
-                            }
+                            viewModel.applySavedTuning(id)
+                            showCustom = true
                         },
+                        onDeleteSaved = { viewModel.deleteTuning(it) },
                         onOpenCustom = { showCustom = true },
                     )
                 }
@@ -416,9 +386,8 @@ private fun TuningSelector(
     customTunings: List<SavedTuning>,
     onPickBuiltin: (Tuning) -> Unit,
     onPickSaved: (String) -> Unit,
-    onLongPressSaved: (String) -> Unit,
-    onDeleteSaved: (String) -> Unit,
     onRenameSaved: (String) -> Unit,
+    onDeleteSaved: (String) -> Unit,
     onOpenCustom: () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -439,15 +408,32 @@ private fun TuningSelector(
                 Text("Your saved tunings", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
                 for (c in customTunings) {
-                    DropdownMenuItem(
-                        text = { Text(c.name) },
-                        onClick = { onPickSaved(c.id); expanded = false },
-                        // Long-press reveals Rename/Delete so the label stays legible (no cramped icon row).
-                        modifier = Modifier.combinedClickable(
+                    val dismissState = rememberSwipeToDismissBoxState()
+                    LaunchedEffect(dismissState.currentValue) {
+                        if (dismissState.currentValue == SwipeToDismissBoxValue.EndToStart) {
+                            onDeleteSaved(c.id)
+                        }
+                    }
+                    SwipeToDismissBox(
+                        state = dismissState,
+                        enableDismissFromStartToEnd = false,
+                        enableDismissFromEndToStart = true,
+                        backgroundContent = {
+                            Box(
+                                Modifier.fillMaxSize().background(Color(0xFFC62828)).padding(end = 24.dp),
+                                contentAlignment = Alignment.CenterEnd,
+                            ) { Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = Color.White) }
+                        },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(c.name) },
                             onClick = { onPickSaved(c.id); expanded = false },
-                            onLongClick = { onLongPressSaved(c.id); expanded = false },
-                        ),
-                    )
+                            modifier = Modifier.combinedClickable(
+                                onClick = { onPickSaved(c.id); expanded = false },
+                                onLongClick = { onRenameSaved(c.id); expanded = false },
+                            ),
+                        )
+                    }
                 }
             }
             HorizontalDivider()
